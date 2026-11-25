@@ -4,6 +4,20 @@
 
 产品不把声音包装成新的“魅力评分”。用户用四段真实回答介绍自己，系统只根据可核对的信息给出推荐理由，并生成一条可朗读、可随时退出的安全见面路线。
 
+## 在线地址
+
+正式演示：<https://esp-jsy.github.io/tingjianni-hear-you/>
+
+仓库：<https://github.com/Esp-jsy/tingjianni-hear-you>
+
+代码推送到 `main` 分支后，GitHub Pages 会自动重新发布：
+
+```powershell
+git add .
+git commit -m "更新说明"
+git push
+```
+
 ## 界面预览
 
 ![听见你首页](docs/screenshots/home-desktop.png)
