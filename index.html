@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="听见你是一款面向视障用户与照片焦虑人群的语音优先交友原型，用真实声音和透明理由帮助人们安全地建立连接。"
+    />
+    <title>听见你｜声音优先的交友与连接</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <header class="site-header">
+      <a class="brand" href="#home" data-nav="home" aria-label="听见你，返回首页">
+        <span class="brand-mark" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </span>
+        <span>
+          <strong>听见你</strong>
+          <small>先听见，再认识</small>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="主导航">
+        <button type="button" data-nav="home" aria-current="page">首页</button>
+        <button type="button" data-nav="matches">听见朋友</button>
+        <button type="button" data-nav="safety">安全说明</button>
+      </nav>
+
+      <div class="display-tools" aria-label="显示设置">
+        <button id="contrast-toggle" type="button" aria-pressed="false" title="切换高对比模式">
+          高对比
+        </button>
+        <button id="text-toggle" type="button" aria-pressed="false" title="放大文字">
+          A+
+        </button>
+        <button id="motion-toggle" type="button" aria-pressed="false" title="减少动态效果">
+          减少动效
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <section id="view-home" class="view home-view" aria-labelledby="home-title">
+        <div class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">公益赛道 · 声音优先的交友</p>
+            <h1 id="home-title">
+              不用先被看见，
+              <span>先被听见。</span>
+            </h1>
+            <p class="hero-lead">
+              照片不应该是认识一个人的唯一入口。用一段真实声音、几个具体问题，
+              找到愿意一起做点小事的人。
+            </p>
+            <div class="hero-actions">
+              <button id="start-button" class="button button-primary" type="button">
+                用声音介绍自己
+                <span aria-hidden="true">→</span>
+              </button>
+              <button id="demo-button" class="button button-ghost" type="button">
+                快速体验完整流程
+              </button>
+            </div>
+            <p class="micro-copy">
+              不使用 AI 变声 · 不公开照片 · 联系前双方确认
+            </p>
+          </div>
+
+          <div class="voice-portrait" aria-label="声音档案示意图：四段声音组成一张没有照片的个人介绍">
+            <div class="orbit orbit-one" aria-hidden="true"></div>
+            <div class="orbit orbit-two" aria-hidden="true"></div>
+            <div class="portrait-center">
+              <div class="live-dot" aria-hidden="true"></div>
+              <p>正在听见</p>
+              <strong>一个真实的人</strong>
+              <div class="waveform wave-large" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <span>00:18</span>
+            </div>
+            <div class="voice-note note-one">
+              <span>01</span>
+              <p>最近开心的小事</p>
+            </div>
+            <div class="voice-note note-two">
+              <span>02</span>
+              <p>理想中的一个下午</p>
+            </div>
+            <div class="voice-note note-three">
+              <span>03</span>
+              <p>希望被怎样理解</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="principles" aria-label="产品原则">
+          <article>
+            <span class="principle-no">01</span>
+            <h2>从真实表达开始</h2>
+            <p>保留停顿、语气和笑意。AI 只辅助文字与活动，不替用户塑造声音。</p>
+          </article>
+          <article>
+            <span class="principle-no">02</span>
+            <h2>理由必须透明</h2>
+            <p>告诉你为什么推荐这个人：共同兴趣、交流方式或活动偏好，不做人格诊断。</p>
+          </article>
+          <article>
+            <span class="principle-no">03</span>
+            <h2>成功发生在线下</h2>
+            <p>目标不是让用户在应用里停留更久，而是安全、舒适地完成一次真实见面。</p>
+          </article>
+        </div>
+
+        <aside class="impact-strip" aria-labelledby="impact-title">
+          <div>
+            <p class="eyebrow">为什么是公益</p>
+            <h2 id="impact-title">照片主导的交友，排除了不止一个人。</h2>
+          </div>
+          <ul>
+            <li><strong>视障用户</strong><span>难以从照片判断资料与表达</span></li>
+            <li><strong>照片焦虑者</strong><span>还没开口，就先被外貌评价</span></li>
+            <li><strong>低社交电量者</strong><span>需要更清楚、更低压力的见面方式</span></li>
+          </ul>
+        </aside>
+      </section>
+
+      <section id="view-profile" class="view form-view" aria-labelledby="profile-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">第一步 · 建立声音坐标</p>
+            <h1 id="profile-title">先说清楚，怎样认识你才舒服</h1>
+            <p>这些信息只用于匹配和安排活动，不会变成“魅力评分”。</p>
+          </div>
+          <div class="step-indicator" aria-label="当前步骤：1，共 3 步">
+            <span class="active">1</span><i></i><span>2</span><i></i><span>3</span>
+          </div>
+        </div>
+
+        <form id="profile-form" class="form-shell" novalidate>
+          <fieldset class="field-group">
+            <legend>别人可以怎么称呼你？</legend>
+            <label class="text-field">
+              <span>显示名称</span>
+              <input
+                id="display-name"
+                name="displayName"
+                type="text"
+                maxlength="20"
+                autocomplete="nickname"
+                placeholder="例如：小林"
+                required
+              />
+            </label>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>你现在期待哪种连接？</legend>
+            <div class="option-grid" id="intent-options">
+              <label class="choice-card">
+                <input type="radio" name="intent" value="friend" checked />
+                <span><strong>认识朋友</strong><small>一起聊天或参加活动</small></span>
+              </label>
+              <label class="choice-card">
+                <input type="radio" name="intent" value="activity" />
+                <span><strong>寻找同频伙伴</strong><small>围绕爱好一起做点事</small></span>
+              </label>
+              <label class="choice-card">
+                <input type="radio" name="intent" value="date" />
+                <span><strong>发展一段关系</strong><small>从了解彼此开始</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>更舒服的交流方式</legend>
+            <div class="segmented-control">
+              <label><input type="radio" name="communication" value="voice" /><span>语音优先</span></label>
+              <label><input type="radio" name="communication" value="mixed" checked /><span>语音与文字</span></label>
+              <label><input type="radio" name="communication" value="text" /><span>文字辅助</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>可以接受多大的见面小组？</legend>
+            <div class="segmented-control">
+              <label><input type="radio" name="groupPreference" value="pair" /><span>一对一见</span></label>
+              <label><input type="radio" name="groupPreference" value="small" checked /><span>三四人小局</span></label>
+              <label><input type="radio" name="groupPreference" value="either" /><span>都可以</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>哪些话题最容易让你打开话匣子？</legend>
+            <p class="field-help">选择 2～8 个。匹配理由只会引用你们共同选择的兴趣。</p>
+            <div class="chip-group" id="interest-options"></div>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>有哪些交流或活动需求？</legend>
+            <p class="field-help">可以多选，也可以不选。</p>
+            <div class="chip-group" id="accessibility-options"></div>
+          </fieldset>
+
+          <p id="profile-error" class="form-error" role="alert" hidden></p>
+          <div class="form-actions">
+            <button class="button button-ghost" type="button" data-nav="home">返回首页</button>
+            <button class="button button-primary" type="submit">继续，留下我的声音 <span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+      </section>
+
+      <section id="view-record" class="view form-view" aria-labelledby="record-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">第二步 · 四段真实声音</p>
+            <h1 id="record-title">没有标准答案，停顿也没关系</h1>
+            <p>每段建议 10～30 秒。录音留在当前设备；初赛原型不上传服务器。</p>
+          </div>
+          <div class="step-indicator" aria-label="当前步骤：2，共 3 步">
+            <span class="complete">✓</span><i></i><span class="active">2</span><i></i><span>3</span>
+          </div>
+        </div>
+
+        <div class="record-layout">
+          <div id="prompt-list" class="prompt-list"></div>
+          <aside class="recording-tips" aria-labelledby="tips-title">
+            <p class="eyebrow">录音提示</p>
+            <h2 id="tips-title">像在和一个朋友说话</h2>
+            <ul>
+              <li>可以先说“我想一想”，真实停顿比背稿更像你。</li>
+              <li>录音保存在本地浏览器，刷新页面后可能消失。</li>
+              <li>如果不方便录音，可以只填写文字回答。</li>
+              <li>不支持语音输入时，浏览器会保留文字填写方式。</li>
+            </ul>
+            <p id="mic-support" class="support-note" aria-live="polite"></p>
+          </aside>
+        </div>
+
+        <p id="record-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button class="button button-ghost" type="button" data-nav="profile">上一步</button>
+          <button id="save-record-button" class="button button-primary" type="button">
+            保存并听见合适的人 <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="view-matches" class="view" aria-labelledby="matches-title" hidden>
+        <div class="view-heading matches-heading">
+          <div>
+            <p class="eyebrow">第三步 · 听见合适的人</p>
+            <h1 id="matches-title">这里没有照片排名，只有可以核对的共同点</h1>
+            <p id="match-intro">先听听对方怎样描述自己，再决定是否继续。</p>
+          </div>
+          <div class="step-indicator" aria-label="当前步骤：3，共 3 步">
+            <span class="complete">✓</span><i></i><span class="complete">✓</span><i></i><span class="active">3</span>
+          </div>
+        </div>
+
+        <div class="match-toolbar" aria-label="匹配筛选">
+          <button type="button" class="filter-chip active" data-filter="all">全部推荐</button>
+          <button type="button" class="filter-chip" data-filter="quiet">安静环境</button>
+          <button type="button" class="filter-chip" data-filter="accessibility">无障碍需求</button>
+          <button type="button" class="filter-chip" data-filter="voice">语音优先</button>
+        </div>
+
+        <div id="match-list" class="match-list"></div>
+        <div class="form-actions">
+          <button class="button button-ghost" type="button" data-nav="record">修改我的声音资料</button>
+        </div>
+      </section>
+
+      <section id="view-detail" class="view" aria-labelledby="detail-title" hidden>
+        <button class="back-button" type="button" data-nav="matches">← 回到推荐</button>
+        <div id="detail-content" class="detail-layout"></div>
+      </section>
+
+      <section id="view-plan" class="view" aria-labelledby="plan-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">安全副驾驶 · 第一次见面</p>
+            <h1 id="plan-title">把“要不要见”变成一条清楚的路线</h1>
+            <p>只确认活动信息，不自动交换联系方式。双方都接受后才会生成见面卡。</p>
+          </div>
+        </div>
+
+        <div class="plan-layout">
+          <form id="plan-form" class="plan-form">
+            <fieldset class="field-group">
+              <legend>你们想从哪里开始？</legend>
+              <div class="place-list">
+                <label class="place-card">
+                  <input type="radio" name="place" value="校园书店" data-duration="30 分钟" checked />
+                  <span>
+                    <strong>校园书店</strong>
+                    <small>安静、有座位、无台阶入口</small>
+                    <em>适合第一次见面</em>
+                  </span>
+                </label>
+                <label class="place-card">
+                  <input type="radio" name="place" value="湖边长椅" data-duration="40 分钟" />
+                  <span>
+                    <strong>湖边长椅</strong>
+                    <small>全程无障碍路线，有安静休息点</small>
+                    <em>适合边散步边聊</em>
+                  </span>
+                </label>
+                <label class="place-card">
+                  <input type="radio" name="place" value="线上语音小组" data-duration="20 分钟" />
+                  <span>
+                    <strong>线上语音小组</strong>
+                    <small>自动转录，可随时关闭麦克风</small>
+                    <em>适合先确认安全感</em>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>活动随行设置</legend>
+              <label class="check-row">
+                <input type="checkbox" name="checkIn" checked />
+                <span><strong>30 分钟后轻柔提醒</strong><small>只询问“是否愿意继续”，不做位置追踪</small></span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" name="quiet" checked />
+                <span><strong>优先安静区域</strong><small>减少环境噪声和社交压力</small></span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" name="route" checked />
+                <span><strong>提供无障碍路线</strong><small>展示入口、电梯、休息点和洗手间</small></span>
+              </label>
+            </fieldset>
+
+            <div class="form-actions">
+              <button class="button button-ghost" type="button" data-nav="detail">返回资料</button>
+              <button class="button button-primary" type="submit">确认这条轻松路线</button>
+            </div>
+          </form>
+
+          <aside class="safety-card">
+            <p class="eyebrow">始终可用</p>
+            <h2>离开不需要解释</h2>
+            <p>
+              “先离开”会向对方显示一条中性消息，不暴露具体原因。任何时候使用，
+              都不会影响你的匹配记录。
+            </p>
+            <button id="exit-button" class="button button-exit" type="button">我需要先离开</button>
+            <div id="exit-status" class="exit-status" role="status" aria-live="polite" hidden></div>
+          </aside>
+        </div>
+
+        <section id="plan-result" class="plan-result" aria-labelledby="plan-result-title" hidden>
+          <div class="plan-result-heading">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+              <p class="eyebrow">见面卡已生成</p>
+              <h2 id="plan-result-title">一次 30 分钟的小小见面</h2>
+            </div>
+          </div>
+          <div id="plan-result-content"></div>
+          <div class="result-actions">
+            <button id="speak-plan-button" class="button button-primary" type="button">朗读见面卡</button>
+            <button class="button button-ghost" type="button" data-nav="matches">回到推荐</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <section id="safety" class="safety-section" aria-labelledby="safety-title" hidden>
+      <div class="safety-section-inner">
+        <p class="eyebrow">安全与边界</p>
+        <h1 id="safety-title">公益产品不应该用信任换取数据</h1>
+        <div class="safety-grid">
+          <article>
+            <h2>声音属于本人</h2>
+            <p>不生成、不变声、不克隆。每段介绍需要本人主动录制并确认用途。</p>
+          </article>
+          <article>
+            <h2>匹配理由可核对</h2>
+            <p>只引用兴趣、交流偏好和活动需求，不推断人格、收入、健康状况或恋爱价值。</p>
+          </article>
+          <article>
+            <h2>先活动，后联系</h2>
+            <p>在双方明确同意前，不自动交换手机号、微信或其他私人联系方式。</p>
+          </article>
+          <article>
+            <h2>无障碍是主流程</h2>
+            <p>读屏、键盘、文字转录和高对比模式参与完整流程，不是上线后补丁。</p>
+          </article>
+        </div>
+        <button class="button button-ghost" type="button" data-nav="home">返回首页</button>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p><strong>听见你</strong> · 青空计划公益赛道原型</p>
+      <p>声音优先，不是照片的去照片化；技术辅助，不替代真实的人。</p>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
