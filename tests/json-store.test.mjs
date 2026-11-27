@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { AuthError } from "../auth.mjs";
-import { createJsonStores } from "../json-store.mjs";
+import { createJsonStores, ensureSeeded } from "../json-store.mjs";
 import { ProfileError } from "../profiles.mjs";
 
 function setup() {
@@ -91,6 +91,26 @@ test("json store lists saved profiles as recommendation candidates", () => {
     ["林夏", "阿航"].sort()
   );
   assert.ok(list.every((item) => item.username && item.updatedAt));
+});
+
+test("json store seeds a fresh database from the previous deployment snapshot", () => {
+  const seedDir = mkdtempSync(join(tmpdir(), "hear-you-seed-"));
+  const seedPath = join(seedDir, "accounts.json");
+  const seedStores = createJsonStores(seedPath);
+  seedStores.auth.register({
+    username: "kept",
+    password: "password123",
+    displayName: "保留账号"
+  });
+
+  const freshDir = mkdtempSync(join(tmpdir(), "hear-you-fresh-"));
+  const storePath = join(freshDir, "hear-you.json");
+  assert.equal(ensureSeeded(storePath, seedPath), true);
+
+  const stores = createJsonStores(storePath);
+  const { user } = stores.auth.login({ username: "kept", password: "password123" });
+  assert.equal(user.username, "kept");
+  assert.equal(ensureSeeded(storePath, seedPath), false);
 });
 
 test("json store keeps data after reopening the file", () => {

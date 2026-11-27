@@ -1,5 +1,11 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync
+} from "node:fs";
 import { dirname } from "node:path";
 import { AuthError, SESSION_TTL_MS } from "./auth.mjs";
 import { normalizedProfile } from "./logic.js";
@@ -35,6 +41,13 @@ function mapUser(user) {
     displayName: user.displayName,
     createdAt: user.createdAt
   };
+}
+
+export function ensureSeeded(storePath, seedPath) {
+  if (!seedPath || existsSync(storePath) || !existsSync(seedPath)) return false;
+  mkdirSync(dirname(storePath), { recursive: true });
+  copyFileSync(seedPath, storePath);
+  return true;
 }
 
 export function createJsonStores(filePath) {

@@ -1,4 +1,5 @@
-import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
@@ -13,6 +14,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const databasePath =
   process.env.HEAR_YOU_DB ||
   (isProduction ? join(tmpdir(), "hear-you", "hear-you.db") : join(root, "data", "hear-you.db"));
+const seedPath = process.env.HEAR_YOU_SEED || join(root, "seed", "accounts.json");
 const sessionCookie = "hear_you_session";
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -46,16 +48,21 @@ if (DatabaseSync) {
   auth = createAuthStore(db);
   profiles = createProfileStore(db);
 } else {
-  const { createJsonStores } = await import("./json-store.mjs");
+  const { createJsonStores, ensureSeeded } = await import("./json-store.mjs");
   storageMode = "json";
   storagePath =
     databasePath === ":memory:"
       ? join(tmpdir(), "hear-you", "hear-you.json")
       : databasePath.replace(/\.db$/i, ".json");
+  if (ensureSeeded(storagePath, seedPath)) {
+    storageMode = "json (seeded)";
+  }
   const stores = createJsonStores(storagePath);
   auth = stores.auth;
   profiles = stores.profiles;
 }
+
+const adminToken = randomBytes(16).toString("hex");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -90,6 +97,13 @@ function readSessionToken(request) {
     if (name === sessionCookie) return rest.join("=");
   }
   return null;
+}
+
+function tokenMatches(provided, expected) {
+  if (typeof provided !== "string" || !expected) return false;
+  const actual = Buffer.from(provided);
+  const target = Buffer.from(expected);
+  return actual.length === target.length && timingSafeEqual(actual, target);
 }
 
 async function readJson(request, maxBytes = 16 * 1024) {
@@ -159,6 +173,24 @@ async function handleApi(request, response, pathname) {
     return;
   }
 
+  if (pathname === "/api/admin/export") {
+    if (request.method !== "GET") throw new HttpError(405, "请求方法不被支持。");
+    if (!tokenMatches(request.headers["x-admin-token"], adminToken)) {
+      throw new HttpError(404, "接口不存在。");
+    }
+    if (!storageMode.startsWith("json")) {
+      throw new HttpError(501, "当前存储不支持导出。");
+    }
+    const raw = JSON.parse(readFileSync(storagePath, "utf8"));
+    sendJson(response, 200, {
+      users: raw.users || [],
+      sessions: raw.sessions || [],
+      profiles: raw.profiles || {},
+      nextUserId: raw.nextUserId || 1
+    });
+    return;
+  }
+
   if (pathname === "/api/profile") {
     const user = auth.userForSession(readSessionToken(request));
     if (!user) {
@@ -199,7 +231,7 @@ function serveStatic(request, response, pathname) {
     return;
   }
 
-  const blockedPrefixes = ["/data", "/.git", "/node_modules"];
+  const blockedPrefixes = ["/data", "/seed", "/.git", "/node_modules"];
   if (blockedPrefixes.some((prefix) => requestPath === prefix || requestPath.startsWith(`${prefix}/`))) {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Not found");
@@ -265,6 +297,7 @@ createServer(async (request, response) => {
 }).listen(port, host, () => {
   console.log(`Hear You is running at http://127.0.0.1:${port}`);
   console.log(`Account storage (${storageMode}): ${storagePath}`);
+  console.log(`Backup key: ${adminToken}`);
   const localAddresses = Object.values(networkInterfaces())
     .flat()
     .filter((address) => address?.family === "IPv4" && !address.internal)
