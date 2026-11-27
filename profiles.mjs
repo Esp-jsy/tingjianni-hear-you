@@ -26,6 +26,13 @@ export function createProfileStore(db) {
     `INSERT INTO profiles (user_id, data, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`
   );
+  const listProfiles = db.prepare(
+    `SELECT p.data, p.updated_at, u.id, u.username, u.display_name
+     FROM profiles p
+     JOIN users u ON u.id = p.user_id
+     ORDER BY p.updated_at DESC
+     LIMIT ?`
+  );
 
   return {
     get(userId) {
@@ -47,6 +54,16 @@ export function createProfileStore(db) {
       const updatedAt = new Date().toISOString();
       upsertProfile.run(userId, JSON.stringify(profile), updatedAt);
       return { profile, updatedAt };
+    },
+
+    list(limit = 20) {
+      return listProfiles.all(limit).map((row) => ({
+        id: Number(row.id),
+        username: row.username,
+        displayName: row.display_name,
+        profile: JSON.parse(row.data),
+        updatedAt: row.updated_at
+      }));
     }
   };
 }

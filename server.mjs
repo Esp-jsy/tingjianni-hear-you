@@ -148,6 +148,17 @@ async function handleApi(request, response, pathname) {
     return;
   }
 
+  if (pathname === "/api/candidates") {
+    if (request.method !== "GET") throw new HttpError(405, "请求方法不被支持。");
+    const viewer = auth.userForSession(readSessionToken(request));
+    sendJson(response, 200, {
+      candidates: profiles
+        .list(20)
+        .filter((item) => !viewer || item.username !== viewer.username)
+    });
+    return;
+  }
+
   if (pathname === "/api/profile") {
     const user = auth.userForSession(readSessionToken(request));
     if (!user) {

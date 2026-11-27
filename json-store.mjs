@@ -184,6 +184,24 @@ export function createJsonStores(filePath) {
       data.profiles[String(userId)] = { profile, updatedAt };
       persist();
       return { profile, updatedAt };
+    },
+
+    list(limit = 20) {
+      return Object.entries(data.profiles)
+        .map(([userId, record]) => {
+          const user = data.users.find((item) => item.id === Number(userId));
+          if (!user) return null;
+          return {
+            id: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            profile: record.profile,
+            updatedAt: record.updatedAt
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+        .slice(0, limit);
     }
   };
 

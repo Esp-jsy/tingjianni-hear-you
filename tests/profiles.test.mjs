@@ -13,7 +13,7 @@ function setup() {
     password: "password123",
     displayName: "林夏"
   });
-  return { profiles, user };
+  return { auth, profiles, user };
 }
 
 test("profile store saves and loads a normalized profile", () => {
@@ -64,4 +64,24 @@ test("profile store updates an existing record", () => {
 
   assert.equal(updated.profile.name, "林夏夏");
   assert.equal(profiles.get(user.id).profile.name, "林夏夏");
+});
+
+test("profile store lists registered users as recommendation candidates", () => {
+  const { auth, profiles, user } = setup();
+  const { user: second } = auth.register({
+    username: "ahang",
+    password: "password123",
+    displayName: "阿航"
+  });
+
+  profiles.save(user.id, { name: "林夏", gender: "female", interests: ["咖啡", "散步"] });
+  profiles.save(second.id, { name: "阿航", gender: "male", interests: ["徒步", "咖啡"] });
+
+  const list = profiles.list();
+  assert.equal(list.length, 2);
+  assert.deepEqual(
+    list.map((item) => item.profile.name).sort(),
+    ["林夏", "阿航"].sort()
+  );
+  assert.ok(list.every((item) => item.username && item.updatedAt));
 });

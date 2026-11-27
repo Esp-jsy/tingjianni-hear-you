@@ -82,6 +82,8 @@ let authUser = null;
 let authMode = "server";
 let localAuth = null;
 let sessionReady = Promise.resolve();
+let liveCandidates = [];
+let candidatesLoading = false;
 let sessionSettled = false;
 
 function loadStoredState() {
@@ -181,8 +183,51 @@ function closePhotoModal() {
   photoModalTrigger = null;
 }
 
+function allCandidates() {
+  return [...DEMO_PROFILES, ...liveCandidates];
+}
+
+function mapAccountCandidates(items) {
+  return items
+    .filter((item) => item && item.profile && item.profile.name)
+    .filter((item) => !authUser || item.username !== authUser.username)
+    .map((item) => {
+      const profile = normalizedProfile(item.profile);
+      const intro =
+        item.profile.intro ||
+        profile.answers.support ||
+        profile.answers.happy ||
+        "通过账号注册加入的成员，资料由本人填写。";
+      return {
+        ...profile,
+        id: `account-${item.id}`,
+        name: profile.name || item.displayName,
+        intro,
+        isAccount: true
+      };
+    });
+}
+
+async function loadLiveCandidates() {
+  if (candidatesLoading) return;
+  candidatesLoading = true;
+  const base = authMode === "server" ? API_BASE : REMOTE_API_BASE;
+
+  try {
+    const payload = await requestJson(`${base}/candidates`);
+    liveCandidates = mapAccountCandidates(payload.candidates || []);
+    if (!document.querySelector("#view-matches").hidden) {
+      renderMatches();
+    }
+  } catch {
+    // 服务器不可用时继续展示演示资料。
+  } finally {
+    candidatesLoading = false;
+  }
+}
+
 function selectedMatch() {
-  const ranked = rankProfiles(state.profile, DEMO_PROFILES);
+  const ranked = rankProfiles(state.profile, allCandidates());
   return (
     ranked.find((item) => item.profile.id === state.selectedMatchId) ||
     ranked[0] ||
@@ -224,6 +269,10 @@ function navigate(view, options = {}) {
     views.forEach((section) => {
       section.hidden = section.id !== `view-${view}`;
     });
+  }
+
+  if (view === "matches") {
+    loadLiveCandidates();
   }
 
   const navView = ["matches", "detail", "plan"].includes(view) ? "matches" : view;
@@ -714,7 +763,7 @@ function renderMatches() {
   });
 
   const ranked = filterProfilesByGender(
-    rankProfiles(state.profile, DEMO_PROFILES),
+    rankProfiles(state.profile, allCandidates()),
     matchGenderFilter
   ).filter(matchPassesFilter);
 
@@ -816,7 +865,7 @@ function renderDetail() {
 
   detailContent.innerHTML = `
     <article class="profile-hero">
-      <p class="eyebrow">声音资料 · 原型演示</p>
+      <p class="eyebrow">${profile.isAccount ? "账号成员 · 资料由本人填写" : "声音资料 · 原型演示"}</p>
       <h1 id="detail-title">${escapeHtml(profile.name)}</h1>
       ${
         profile.photo
@@ -980,7 +1029,7 @@ function createPlan(event) {
 }
 
 function sendInvite(plan) {
-  const match = DEMO_PROFILES.find((profile) => profile.id === plan.profileId);
+  const match = allCandidates().find((profile) => profile.id === plan.profileId);
   invites[plan.profileId] = {
     id: `invite-${Date.now()}`,
     profileId: plan.profileId,
@@ -1652,6 +1701,7 @@ function bindEvents() {
   });
 
   refreshMatches.addEventListener("click", () => {
+    loadLiveCandidates();
     if (matchBatchCount <= 1) {
       showToast("当前筛选下已经是全部人选。");
       return;

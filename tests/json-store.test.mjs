@@ -76,6 +76,23 @@ test("json store rejects oversized photos", () => {
   );
 });
 
+test("json store lists saved profiles as recommendation candidates", () => {
+  const { auth, profiles } = setup();
+  const first = auth.register({ username: "linxia", password: "password123" }).user;
+  const second = auth.register({ username: "ahang", password: "password123" }).user;
+
+  profiles.save(first.id, { name: "林夏", gender: "female", interests: ["咖啡", "散步"] });
+  profiles.save(second.id, { name: "阿航", gender: "male", interests: ["徒步", "咖啡"] });
+
+  const list = profiles.list();
+  assert.equal(list.length, 2);
+  assert.deepEqual(
+    list.map((item) => item.profile.name).sort(),
+    ["林夏", "阿航"].sort()
+  );
+  assert.ok(list.every((item) => item.username && item.updatedAt));
+});
+
 test("json store keeps data after reopening the file", () => {
   const { filePath, auth, profiles } = setup();
   const { user, token } = auth.register({ username: "linxia", password: "password123" });
