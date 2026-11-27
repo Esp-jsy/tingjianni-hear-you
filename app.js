@@ -58,6 +58,7 @@ let authUser = null;
 let authMode = "server";
 let localAuth = null;
 let sessionReady = Promise.resolve();
+let sessionSettled = false;
 
 function loadStoredState() {
   try {
@@ -842,6 +843,7 @@ function renderPlanInvite(plan) {
 
   const meta = inviteStatusLabel(invite.status);
   const responded = invite.status !== "pending";
+  const canSimulateResponse = authMode === "server" && sessionSettled;
   const timeLabel = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
@@ -861,7 +863,9 @@ function renderPlanInvite(plan) {
           ${
             responded
               ? "如需调整时间或地点，修改左侧安排后重新确认路线，会再次发送邀请。"
-              : "真实产品里 TA 会在自己的设备上收到通知；这个原型可以在下方切换到对方视角替 TA 回应。"
+              : canSimulateResponse
+              ? "真实产品里 TA 会在自己的设备上收到通知；这个原型可以在下方切换到对方视角替 TA 回应。"
+              : "TA 会在自己的设备上收到通知并自行回应；当前线上演示不会跨设备送达，邀请会保持等待状态。"
           }
         </p>
       </div>
@@ -879,6 +883,9 @@ function renderPlanInvite(plan) {
         )}</p>
       </div>
     </div>
+    ${
+      canSimulateResponse
+        ? `
     <div class="invite-actions">
       <button class="button ${responded ? "button-ghost" : "button-primary"}" type="button" data-invite-role="toggle">
         ${responded ? "再看一次 TA 的回应（演示）" : "查看 TA 收到的通知（演示）"}
@@ -913,23 +920,28 @@ function renderPlanInvite(plan) {
       `
       }
     </div>
+    `
+        : ""
+    }
   `;
 
   const counterpart = inviteSection.querySelector("[data-invite-role='counterpart']");
   const toggle = inviteSection.querySelector("[data-invite-role='toggle']");
 
-  toggle.addEventListener("click", () => {
-    counterpart.hidden = !counterpart.hidden;
-    if (!counterpart.hidden) {
-      counterpart.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      counterpart.querySelector("[data-invite-role='reply']")?.focus();
-    }
-  });
+  if (counterpart && toggle) {
+    toggle.addEventListener("click", () => {
+      counterpart.hidden = !counterpart.hidden;
+      if (!counterpart.hidden) {
+        counterpart.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        counterpart.querySelector("[data-invite-role='reply']")?.focus();
+      }
+    });
 
-  inviteSection.querySelector("[data-invite-role='close']").addEventListener("click", () => {
-    counterpart.hidden = true;
-    toggle.focus();
-  });
+    inviteSection.querySelector("[data-invite-role='close']")?.addEventListener("click", () => {
+      counterpart.hidden = true;
+      toggle.focus();
+    });
+  }
 
   const respond = (status) => {
     const reply =
@@ -1067,7 +1079,11 @@ async function loadSession() {
       authUser = null;
     }
   }
+  sessionSettled = true;
   updateAccountUI();
+  if (state.plan && !planResult.hidden) {
+    renderPlanInvite(state.plan);
+  }
 }
 
 async function submitAuthRequest(path, runLocal, body) {
