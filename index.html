@@ -581,6 +581,26 @@
       <p>声音优先，不是照片的去照片化；技术辅助，不替代真实的人。</p>
     </footer>
 
+    <div
+      id="photo-modal"
+      class="photo-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="photo-modal-caption"
+      hidden
+    >
+      <div class="photo-modal-panel">
+        <button
+          id="photo-modal-close"
+          class="photo-modal-close"
+          type="button"
+          aria-label="关闭大图"
+        >×</button>
+        <img id="photo-modal-image" src="" alt="" />
+        <p id="photo-modal-caption" class="photo-modal-caption"></p>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
     <script type="module" src="./app.js"></script>
   </body>

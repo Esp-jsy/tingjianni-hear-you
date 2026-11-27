@@ -54,11 +54,17 @@ export const INTERESTS = [
   "手工"
 ];
 
+const portraitPhoto = (prompt) =>
+  `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=square_hd`;
+
 export const DEMO_PROFILES = [
   {
     id: "zhou-yuan",
     name: "周予安",
     gender: "female",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese woman in her twenties, soft window light, cozy bookstore, gentle smile, realistic photography"
+    ),
     intent: "friend",
     communication: "voice",
     groupPreference: "small",
@@ -76,6 +82,9 @@ export const DEMO_PROFILES = [
     id: "chen-mo",
     name: "陈默",
     gender: "male",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese man in his twenties holding a vintage camera, overcast city street, quiet expression, realistic photography"
+    ),
     intent: "activity",
     communication: "mixed",
     groupPreference: "pair",
@@ -93,6 +102,9 @@ export const DEMO_PROFILES = [
     id: "a-lan",
     name: "阿岚",
     gender: "female",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese woman with headphones, warm desk lamp, small game room, relaxed smile, realistic photography"
+    ),
     intent: "friend",
     communication: "voice",
     groupPreference: "either",
@@ -110,6 +122,9 @@ export const DEMO_PROFILES = [
     id: "shen-zhiyao",
     name: "沈知遥",
     gender: "male",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese man with a camera, rainy bus stop, soft daylight, thoughtful expression, realistic photography"
+    ),
     intent: "activity",
     communication: "mixed",
     groupPreference: "pair",
@@ -127,6 +142,9 @@ export const DEMO_PROFILES = [
     id: "xu-nan",
     name: "许南",
     gender: "female",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese woman reading by a window, potted plants, afternoon light, calm expression, realistic photography"
+    ),
     intent: "friend",
     communication: "text",
     groupPreference: "small",
@@ -144,6 +162,9 @@ export const DEMO_PROFILES = [
     id: "lin-yue",
     name: "林越",
     gender: "male",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese man at a small live music venue, warm stage light, relaxed smile, realistic photography"
+    ),
     intent: "date",
     communication: "voice",
     groupPreference: "pair",
@@ -161,6 +182,9 @@ export const DEMO_PROFILES = [
     id: "su-he",
     name: "苏禾",
     gender: "female",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese woman doing crafts at a wooden table, dried leaves, soft daylight, focused expression, realistic photography"
+    ),
     intent: "activity",
     communication: "mixed",
     groupPreference: "either",
@@ -178,6 +202,9 @@ export const DEMO_PROFILES = [
     id: "gu-xing",
     name: "顾行",
     gender: "male",
+    photo: portraitPhoto(
+      "natural candid portrait of a young Chinese man walking by a river at dusk, calm expression, realistic photography"
+    ),
     intent: "friend",
     communication: "voice",
     groupPreference: "small",

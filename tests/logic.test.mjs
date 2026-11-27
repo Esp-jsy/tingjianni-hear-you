@@ -110,3 +110,12 @@ test("paginateProfiles splits candidates into batches and clamps the page", () =
   assert.equal(last.page, last.totalPages - 1);
   assert.ok(last.items.length > 0);
 });
+
+test("every demo profile has a portrait photo for the enlarge preview", () => {
+  DEMO_PROFILES.forEach((profile) => {
+    assert.match(
+      profile.photo,
+      /^https:\/\/trae-api-cn\.mchost\.guru\/api\/ide\/v1\/text_to_image\?prompt=/
+    );
+  });
+});

@@ -55,6 +55,10 @@ const photoRemove = document.querySelector("#photo-remove");
 const photoStatus = document.querySelector("#photo-status");
 const refreshMatches = document.querySelector("#refresh-matches");
 const matchBatch = document.querySelector("#match-batch");
+const photoModal = document.querySelector("#photo-modal");
+const photoModalImage = document.querySelector("#photo-modal-image");
+const photoModalClose = document.querySelector("#photo-modal-close");
+const photoModalCaption = document.querySelector("#photo-modal-caption");
 
 const mediaRecorderSupported =
   "MediaRecorder" in window && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -141,6 +145,30 @@ function showToast(message) {
   }, 3600);
 }
 
+let photoModalTrigger = null;
+
+function openPhotoModal(src, alt, trigger) {
+  if (!src) return;
+  photoModalTrigger = trigger || null;
+  photoModalImage.src = src;
+  photoModalImage.alt = alt;
+  photoModalCaption.textContent = alt;
+  photoModal.hidden = false;
+  document.body.classList.add("modal-open");
+  photoModalClose.focus();
+}
+
+function closePhotoModal() {
+  if (photoModal.hidden) return;
+  photoModal.hidden = true;
+  photoModalImage.removeAttribute("src");
+  photoModalImage.alt = "";
+  photoModalCaption.textContent = "";
+  document.body.classList.remove("modal-open");
+  if (photoModalTrigger) photoModalTrigger.focus();
+  photoModalTrigger = null;
+}
+
 function selectedMatch() {
   const ranked = rankProfiles(state.profile, DEMO_PROFILES);
   return (
@@ -164,6 +192,7 @@ function currentViewFromHash() {
 function navigate(view, options = {}) {
   const { focus = true, updateHash = true } = options;
   const guardedViews = ["matches", "detail", "plan"];
+  closePhotoModal();
 
   if (guardedViews.includes(view) && !profileIsReady(state.profile)) {
     showToast("先留下显示名称、至少两个兴趣和一段回答，再开始匹配。");
@@ -691,9 +720,19 @@ function renderMatches() {
     .map(
       (item, index) => `
         <article class="match-card" style="animation-delay:${index * 55}ms">
-          <div class="voice-avatar" aria-hidden="true">
-            <div class="waveform"><i></i><i></i><i></i><i></i><i></i></div>
-          </div>
+          ${
+            item.profile.photo
+              ? `<button
+                  class="match-photo"
+                  type="button"
+                  data-photo-src="${escapeHtml(item.profile.photo)}"
+                  data-photo-alt="${escapeHtml(item.profile.name)}的照片"
+                  aria-label="放大查看 ${escapeHtml(item.profile.name)} 的照片"
+                ><img src="${escapeHtml(item.profile.photo)}" alt="" loading="lazy" /></button>`
+              : `<div class="voice-avatar" aria-hidden="true">
+                  <div class="waveform"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>`
+          }
           <div class="match-main">
             <h2>${escapeHtml(item.profile.name)}</h2>
             <div class="match-meta">
@@ -761,6 +800,20 @@ function renderDetail() {
     <article class="profile-hero">
       <p class="eyebrow">声音资料 · 原型演示</p>
       <h1 id="detail-title">${escapeHtml(profile.name)}</h1>
+      ${
+        profile.photo
+          ? `<button
+              class="detail-photo"
+              type="button"
+              data-photo-src="${escapeHtml(profile.photo)}"
+              data-photo-alt="${escapeHtml(profile.name)}的照片"
+              aria-label="放大查看 ${escapeHtml(profile.name)} 的照片"
+            >
+              <img src="${escapeHtml(profile.photo)}" alt="${escapeHtml(profile.name)}的照片" loading="lazy" />
+              <span>点击放大</span>
+            </button>`
+          : ""
+      }
       <blockquote>“${escapeHtml(profile.intro)}”</blockquote>
       <div class="voice-player">
         <button
@@ -1388,8 +1441,27 @@ function bindEvents() {
       return;
     }
 
+    const photoTrigger = event.target.closest("[data-photo-src]");
+    if (photoTrigger) {
+      event.preventDefault();
+      openPhotoModal(
+        photoTrigger.dataset.photoSrc,
+        photoTrigger.dataset.photoAlt || "照片",
+        photoTrigger
+      );
+      return;
+    }
+
     const choiceButton = event.target.closest("[data-choice-type]");
     if (choiceButton) toggleChoice(choiceButton);
+  });
+
+  photoModalClose.addEventListener("click", closePhotoModal);
+  photoModal.addEventListener("click", (event) => {
+    if (event.target === photoModal) closePhotoModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closePhotoModal();
   });
 
   document.querySelector("#profile-form").addEventListener("submit", (event) => {
