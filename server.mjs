@@ -5,6 +5,7 @@ import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { AuthError, SESSION_TTL_MS, createAuthStore } from "./auth.mjs";
+import { ProfileError, createProfileStore } from "./profiles.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 4173);
@@ -27,6 +28,7 @@ if (databasePath !== ":memory:") {
 
 const db = new DatabaseSync(databasePath);
 const auth = createAuthStore(db);
+const profiles = createProfileStore(db);
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -63,12 +65,12 @@ function readSessionToken(request) {
   return null;
 }
 
-async function readJson(request) {
+async function readJson(request, maxBytes = 16 * 1024) {
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > 16 * 1024) {
+    if (size > maxBytes) {
       throw new HttpError(413, "请求内容过大。");
     }
     chunks.push(chunk);
@@ -83,8 +85,8 @@ async function readJson(request) {
   }
 }
 
-async function readJsonObject(request) {
-  const value = await readJson(request);
+async function readJsonObject(request, maxBytes) {
+  const value = await readJson(request, maxBytes);
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new HttpError(400, "请求内容格式不正确。");
   }
@@ -117,6 +119,33 @@ async function handleApi(request, response, pathname) {
     if (request.method !== "GET") throw new HttpError(405, "请求方法不被支持。");
     sendJson(response, 200, { user: auth.userForSession(readSessionToken(request)) });
     return;
+  }
+
+  if (pathname === "/api/profile") {
+    const user = auth.userForSession(readSessionToken(request));
+    if (!user) {
+      throw new AuthError(401, "请先登录后再同步资料。");
+    }
+
+    if (request.method === "GET") {
+      const record = profiles.get(user.id);
+      sendJson(response, 200, {
+        profile: record ? record.profile : null,
+        updatedAt: record ? record.updatedAt : null
+      });
+      return;
+    }
+
+    if (request.method === "PUT") {
+      const body = await readJsonObject(request, 600 * 1024);
+      if (!body.profile || typeof body.profile !== "object" || Array.isArray(body.profile)) {
+        throw new HttpError(400, "资料格式不正确。");
+      }
+      sendJson(response, 200, profiles.save(user.id, body.profile));
+      return;
+    }
+
+    throw new HttpError(405, "请求方法不被支持。");
   }
 
   throw new HttpError(404, "接口不存在。");
@@ -173,7 +202,8 @@ createServer(async (request, response) => {
 
     serveStatic(request, response, url.pathname);
   } catch (error) {
-    const isExpected = error instanceof AuthError || error instanceof HttpError;
+    const isExpected =
+      error instanceof AuthError || error instanceof HttpError || error instanceof ProfileError;
     if (!isExpected) console.error(error);
     if (!response.headersSent) {
       sendJson(response, isExpected ? error.status : 500, {

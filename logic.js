@@ -4,6 +4,19 @@ export const INTENTS = {
   date: "发展一段关系"
 };
 
+export const GENDERS = {
+  female: "女生",
+  male: "男生",
+  nonbinary: "其他",
+  undisclosed: "不透露"
+};
+
+export const GENDER_FILTERS = [
+  { value: "all", label: "全部" },
+  { value: "female", label: "女生" },
+  { value: "male", label: "男生" }
+];
+
 export const COMMUNICATION = {
   voice: "语音优先",
   text: "文字辅助",
@@ -45,6 +58,7 @@ export const DEMO_PROFILES = [
   {
     id: "zhou-yuan",
     name: "周予安",
+    gender: "female",
     intent: "friend",
     communication: "voice",
     groupPreference: "small",
@@ -61,6 +75,7 @@ export const DEMO_PROFILES = [
   {
     id: "chen-mo",
     name: "陈默",
+    gender: "male",
     intent: "activity",
     communication: "mixed",
     groupPreference: "pair",
@@ -77,6 +92,7 @@ export const DEMO_PROFILES = [
   {
     id: "a-lan",
     name: "阿岚",
+    gender: "female",
     intent: "friend",
     communication: "voice",
     groupPreference: "either",
@@ -89,6 +105,91 @@ export const DEMO_PROFILES = [
       try: "想组织一次只有四个人的小型游戏之夜。"
     },
     intro: "你好，我是阿岚。声音让我能保留停顿和笑意，也让资料不只剩下几张照片。"
+  },
+  {
+    id: "shen-zhiyao",
+    name: "沈知遥",
+    gender: "male",
+    intent: "activity",
+    communication: "mixed",
+    groupPreference: "pair",
+    interests: ["摄影", "城市漫游", "咖啡", "旧电影"],
+    accessibility: ["无障碍路线", "不公开照片"],
+    answers: {
+      happy: "在旧城区拍到一块掉了漆的招牌，颜色像一部老电影。",
+      afternoon: "带上相机坐一趟没坐过的公交，在终点站附近找家小店坐一会儿。",
+      support: "我说话比较慢，想到哪里说哪里，不需要帮我总结。",
+      try: "想拍一组关于雨天公交站的照片，需要有人帮我撑伞。"
+    },
+    intro: "我是沈知遥。比起展示自己，我更想先听听你最近在做什么。"
+  },
+  {
+    id: "xu-nan",
+    name: "许南",
+    gender: "female",
+    intent: "friend",
+    communication: "text",
+    groupPreference: "small",
+    interests: ["阅读", "植物", "做饭", "播客"],
+    accessibility: ["安静低刺激环境", "字幕与文字转录"],
+    answers: {
+      happy: "阳台上那盆薄荷终于长出新叶子，泡水喝有很淡的香味。",
+      afternoon: "在图书馆各看各的书，傍晚一起去菜市场买点菜。",
+      support: "我更喜欢用文字约时间，见面时安静待着也不会尴尬。",
+      try: "想试试四个人的小型读书会，每人带一本薄薄的书。"
+    },
+    intro: "你好，我是许南。说话不多，但会认真记住你提过的小事。"
+  },
+  {
+    id: "lin-yue",
+    name: "林越",
+    gender: "male",
+    intent: "date",
+    communication: "voice",
+    groupPreference: "pair",
+    interests: ["现场音乐", "独立游戏", "桌游", "咖啡"],
+    accessibility: ["读屏支持", "不公开照片"],
+    answers: {
+      happy: "和朋友打通了一个很难的双人合作游戏，笑到半夜。",
+      afternoon: "先在咖啡店玩一局桌游，再去看一场小型演出。",
+      support: "有事直接说就好，我不太会猜暗示，但会认真回应。",
+      try: "想找人一起去看下个月的独立音乐现场。"
+    },
+    intro: "我是林越。声音比照片更能说明我现在的状态。"
+  },
+  {
+    id: "su-he",
+    name: "苏禾",
+    gender: "female",
+    intent: "activity",
+    communication: "mixed",
+    groupPreference: "either",
+    interests: ["手工", "植物", "摄影", "散步"],
+    accessibility: ["安静低刺激环境", "无障碍路线"],
+    answers: {
+      happy: "把捡来的落叶压进本子里，做成了几张书签。",
+      afternoon: "逛一趟花市，找一个有长椅的地方慢慢整理照片。",
+      support: "如果我在专注做东西，可以直接拍我一下，我不会觉得被打扰。",
+      try: "想组织一次四五个人的手工交换小聚。"
+    },
+    intro: "你好，我是苏禾。喜欢慢慢做东西，也喜欢慢慢认识一个人。"
+  },
+  {
+    id: "gu-xing",
+    name: "顾行",
+    gender: "male",
+    intent: "friend",
+    communication: "voice",
+    groupPreference: "small",
+    interests: ["播客", "阅读", "城市漫游", "做饭"],
+    accessibility: ["字幕与文字转录", "不公开照片"],
+    answers: {
+      happy: "录了一期只有八分钟的播客，第一次没有剪掉自己的停顿。",
+      afternoon: "沿着江边走一段，找一家能看见水的小店吃晚饭。",
+      support: "我偶尔会突然没话说，那不是不想聊，只是需要一点时间。",
+      try: "想做一期关于普通人的城市夜晚的播客，找个人一起走一趟。"
+    },
+    intro: "我是顾行。喜欢边走边聊，也接受沉默。"
   }
 ];
 
@@ -154,6 +255,11 @@ export function rankProfiles(user, profiles = DEMO_PROFILES) {
 export function normalizedProfile(input) {
   return {
     name: String(input.name || "").trim(),
+    gender: GENDERS[input.gender] ? input.gender : "undisclosed",
+    photo:
+      typeof input.photo === "string" && input.photo.startsWith("data:image/")
+        ? input.photo
+        : "",
     intent: INTENTS[input.intent] ? input.intent : "friend",
     communication: COMMUNICATION[input.communication] ? input.communication : "mixed",
     groupPreference: GROUP_PREFERENCES[input.groupPreference] ? input.groupPreference : "either",
@@ -183,4 +289,19 @@ export function buildMatchSummary(profile) {
 export function planLabel(plan) {
   if (!plan) return "尚未安排见面";
   return `${plan.place} · ${plan.duration} · ${plan.groupSize}`;
+}
+
+export function filterProfilesByGender(ranked, gender) {
+  if (!gender || gender === "all") return ranked;
+  return ranked.filter((item) => item.profile.gender === gender);
+}
+
+export function paginateProfiles(ranked, page = 0, size = 3) {
+  const totalPages = Math.max(1, Math.ceil(ranked.length / size));
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
+  return {
+    items: ranked.slice(safePage * size, safePage * size + size),
+    page: safePage,
+    totalPages
+  };
 }

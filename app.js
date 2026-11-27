@@ -2,12 +2,15 @@ import {
   ACCESSIBILITY_OPTIONS,
   COMMUNICATION,
   DEMO_PROFILES,
+  GENDERS,
   GROUP_PREFERENCES,
   INTERESTS,
   INTENTS,
   START_PROMPTS,
   buildMatchSummary,
+  filterProfilesByGender,
   normalizedProfile,
+  paginateProfiles,
   planLabel,
   profileIsReady,
   rankProfiles
@@ -45,6 +48,13 @@ const loginError = document.querySelector("#login-error");
 const registerError = document.querySelector("#register-error");
 const accountName = document.querySelector("#account-name");
 const accountMeta = document.querySelector("#account-meta");
+const photoPreview = document.querySelector("#photo-preview");
+const photoInput = document.querySelector("#photo-input");
+const photoChoose = document.querySelector("#photo-choose");
+const photoRemove = document.querySelector("#photo-remove");
+const photoStatus = document.querySelector("#photo-status");
+const refreshMatches = document.querySelector("#refresh-matches");
+const matchBatch = document.querySelector("#match-batch");
 
 const mediaRecorderSupported =
   "MediaRecorder" in window && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -53,6 +63,10 @@ const recordedUrls = new Map();
 
 let activeRecording = null;
 let matchFilter = "all";
+let matchGenderFilter = "all";
+let matchPage = 0;
+let matchBatchCount = 1;
+const MATCH_PAGE_SIZE = 3;
 let toastTimer;
 let authUser = null;
 let authMode = "server";
@@ -236,6 +250,9 @@ function renderProfileChoices() {
 
 function hydrateProfileForm() {
   document.querySelector("#display-name").value = state.profile.name || "";
+  document.querySelectorAll('input[name="gender"]').forEach((input) => {
+    input.checked = input.value === state.profile.gender;
+  });
   document.querySelectorAll('input[name="intent"]').forEach((input) => {
     input.checked = input.value === state.profile.intent;
   });
@@ -245,7 +262,61 @@ function hydrateProfileForm() {
   document.querySelectorAll('input[name="groupPreference"]').forEach((input) => {
     input.checked = input.value === state.profile.groupPreference;
   });
+  renderPhotoPreview();
   renderProfileChoices();
+}
+
+function renderPhotoPreview() {
+  if (state.profile.photo) {
+    photoPreview.innerHTML = `<img src="${escapeHtml(state.profile.photo)}" alt="你的照片预览" />`;
+  } else {
+    photoPreview.innerHTML = "<span>尚未选择照片</span>";
+  }
+  photoRemove.hidden = !state.profile.photo;
+}
+
+function compressPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("照片读取失败，请重试。"));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("无法识别这张图片，请换一张。"));
+      image.onload = () => {
+        const maxEdge = 640;
+        const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoChange(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    photoStatus.textContent = "请选择图片文件（JPG / PNG 等）。";
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    photoStatus.textContent = "图片超过 8MB，请换一张更小的。";
+    return;
+  }
+
+  photoStatus.textContent = "正在压缩照片…";
+  try {
+    state.profile.photo = await compressPhoto(file);
+    persistState();
+    renderPhotoPreview();
+    photoStatus.textContent = "照片已保存，可随时移除或重新选择。";
+  } catch (error) {
+    photoStatus.textContent = error.message;
+  }
 }
 
 function toggleChoice(button) {
@@ -277,6 +348,7 @@ function saveProfileStep() {
   state.profile = normalizedProfile({
     ...state.profile,
     name: formData.get("displayName"),
+    gender: formData.get("gender"),
     intent: formData.get("intent"),
     communication: formData.get("communication"),
     groupPreference: formData.get("groupPreference")
@@ -290,6 +362,9 @@ function saveProfileStep() {
   }
 
   persistState();
+  syncProfileToServer().then((synced) => {
+    if (synced) showToast("资料已保存并同步到服务器。");
+  });
   navigate("record");
 }
 
@@ -545,6 +620,9 @@ function saveRecordStep() {
   }
 
   persistState();
+  syncProfileToServer().then((synced) => {
+    if (synced) showToast("资料已保存并同步到服务器。");
+  });
   navigate("matches");
 }
 
@@ -572,7 +650,7 @@ function renderMatches() {
     ? `${state.profile.name}，先听声音和具体回答，再决定是否继续。`
     : "先听声音和具体回答，再决定是否继续。";
 
-  document.querySelectorAll(".filter-chip").forEach((button) => {
+  document.querySelectorAll(".filter-chip[data-filter]").forEach((button) => {
     button.classList.toggle("active", button.dataset.filter === matchFilter);
     button.setAttribute(
       "aria-pressed",
@@ -580,8 +658,21 @@ function renderMatches() {
     );
   });
 
-  const ranked = rankProfiles(state.profile, DEMO_PROFILES).filter(matchPassesFilter);
+  document.querySelectorAll(".filter-chip[data-gender]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.gender === matchGenderFilter);
+    button.setAttribute(
+      "aria-pressed",
+      button.dataset.gender === matchGenderFilter ? "true" : "false"
+    );
+  });
+
+  const ranked = filterProfilesByGender(
+    rankProfiles(state.profile, DEMO_PROFILES),
+    matchGenderFilter
+  ).filter(matchPassesFilter);
+
   if (!ranked.length) {
+    matchBatch.textContent = "当前筛选下暂无人选";
     matchList.innerHTML = `
       <div class="empty-state">
         <h2>这一组暂时没有合适的人</h2>
@@ -591,7 +682,12 @@ function renderMatches() {
     return;
   }
 
-  matchList.innerHTML = ranked
+  const batch = paginateProfiles(ranked, matchPage, MATCH_PAGE_SIZE);
+  matchPage = batch.page;
+  matchBatchCount = batch.totalPages;
+  matchBatch.textContent = `第 ${batch.page + 1} / ${batch.totalPages} 批 · 共 ${ranked.length} 人`;
+
+  matchList.innerHTML = batch.items
     .map(
       (item, index) => `
         <article class="match-card" style="animation-delay:${index * 55}ms">
@@ -601,6 +697,7 @@ function renderMatches() {
           <div class="match-main">
             <h2>${escapeHtml(item.profile.name)}</h2>
             <div class="match-meta">
+              <span class="meta-tag">${escapeHtml(GENDERS[item.profile.gender])}</span>
               <span class="meta-tag">${escapeHtml(INTENTS[item.profile.intent])}</span>
               <span class="meta-tag">${escapeHtml(COMMUNICATION[item.profile.communication])}</span>
               <span class="meta-tag">${escapeHtml(item.profile.interests.slice(0, 2).join(" · "))}</span>
@@ -678,6 +775,7 @@ function renderDetail() {
         <small>原型使用浏览器朗读<br />正式版播放本人录音</small>
       </div>
       <div class="profile-tags">
+        <span>${escapeHtml(GENDERS[profile.gender])}</span>
         <span>${escapeHtml(INTENTS[profile.intent])}</span>
         <span>${escapeHtml(COMMUNICATION[profile.communication])}</span>
         <span>${escapeHtml(GROUP_PREFERENCES[profile.groupPreference])}</span>
@@ -978,6 +1076,8 @@ function startQuickDemo(targetView = "matches") {
   if (activeRecording) stopRecording();
   state.profile = normalizedProfile({
     name: "林夏",
+    gender: "female",
+    photo: "",
     intent: "friend",
     communication: "voice",
     groupPreference: "small",
@@ -1025,6 +1125,34 @@ function authErrorMessage(error) {
     return "无法连接账号服务，请确认已通过 npm start 启动本地服务器。";
   }
   return error.message || "请求失败，请稍后再试。";
+}
+
+async function syncProfileToServer() {
+  if (authMode !== "server" || !authUser) return false;
+  try {
+    await requestJson(`${API_BASE}/profile`, {
+      method: "PUT",
+      body: { profile: state.profile }
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function restoreServerProfile() {
+  if (authMode !== "server" || !authUser) return;
+  try {
+    const { profile } = await requestJson(`${API_BASE}/profile`);
+    if (profile && !profileIsReady(state.profile)) {
+      state.profile = normalizedProfile(profile);
+      persistState();
+      hydrateProfileForm();
+      renderPromptList();
+    }
+  } catch {
+    // 资料接口暂时不可用时保持本地资料。
+  }
 }
 
 function renderAccountView() {
@@ -1081,6 +1209,7 @@ async function loadSession() {
   }
   sessionSettled = true;
   updateAccountUI();
+  await restoreServerProfile();
   if (state.plan && !planResult.hidden) {
     renderPlanInvite(state.plan);
   }
@@ -1146,6 +1275,7 @@ async function handleLogin(event) {
     authUser = user;
     loginForm.reset();
     updateAccountUI();
+    await restoreServerProfile();
     showToast(`欢迎回来，${user.displayName}。`);
     navigate("home");
   } catch (error) {
@@ -1267,6 +1397,18 @@ function bindEvents() {
     saveProfileStep();
   });
 
+  photoChoose.addEventListener("click", () => photoInput.click());
+  photoInput.addEventListener("change", () => {
+    handlePhotoChange(photoInput.files?.[0]);
+    photoInput.value = "";
+  });
+  photoRemove.addEventListener("click", () => {
+    state.profile.photo = "";
+    persistState();
+    renderPhotoPreview();
+    photoStatus.textContent = "照片已移除。";
+  });
+
   document.querySelector("#save-record-button").addEventListener("click", saveRecordStep);
   document.querySelector("#demo-button").addEventListener("click", startQuickDemo);
   document.querySelector("#start-button").addEventListener("click", () => navigate("profile"));
@@ -1295,11 +1437,33 @@ function bindEvents() {
     );
   });
 
-  document.querySelector(".match-toolbar").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-filter]");
-    if (!button) return;
-    matchFilter = button.dataset.filter;
+  document.querySelectorAll(".match-toolbar").forEach((toolbar) => {
+    toolbar.addEventListener("click", (event) => {
+      const filterButton = event.target.closest("[data-filter]");
+      if (filterButton) {
+        matchFilter = filterButton.dataset.filter;
+        matchPage = 0;
+        renderMatches();
+        return;
+      }
+
+      const genderButton = event.target.closest("[data-gender]");
+      if (genderButton) {
+        matchGenderFilter = genderButton.dataset.gender;
+        matchPage = 0;
+        renderMatches();
+      }
+    });
+  });
+
+  refreshMatches.addEventListener("click", () => {
+    if (matchBatchCount <= 1) {
+      showToast("当前筛选下已经是全部人选。");
+      return;
+    }
+    matchPage = (matchPage + 1) % matchBatchCount;
     renderMatches();
+    showToast("已换一批人选。");
   });
 
   window.addEventListener("hashchange", () => {

@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   DEMO_PROFILES,
   buildMatchSummary,
+  filterProfilesByGender,
   normalizedProfile,
   overlap,
+  paginateProfiles,
   planLabel,
   profileIsReady,
   rankProfiles,
@@ -76,4 +78,35 @@ test("planLabel presents a readable plan without private data", () => {
     planLabel({ place: "校园书店", duration: "30 分钟", groupSize: "三四人小局" }),
     "校园书店 · 30 分钟 · 三四人小局"
   );
+});
+
+test("normalizedProfile keeps a valid gender and drops non data-url photos", () => {
+  const profile = normalizedProfile({
+    name: "林夏",
+    gender: "female",
+    photo: "https://example.com/photo.jpg"
+  });
+  assert.equal(profile.gender, "female");
+  assert.equal(profile.photo, "");
+  assert.equal(normalizedProfile({}).gender, "undisclosed");
+});
+
+test("filterProfilesByGender keeps only the requested gender", () => {
+  const ranked = rankProfiles(demoUser);
+  const women = filterProfilesByGender(ranked, "female");
+  assert.ok(women.length > 0);
+  assert.ok(women.every((item) => item.profile.gender === "female"));
+  assert.equal(filterProfilesByGender(ranked, "all"), ranked);
+});
+
+test("paginateProfiles splits candidates into batches and clamps the page", () => {
+  const ranked = rankProfiles(demoUser);
+  const first = paginateProfiles(ranked, 0, 3);
+  assert.equal(first.items.length, 3);
+  assert.equal(first.page, 0);
+  assert.ok(first.totalPages >= 3);
+
+  const last = paginateProfiles(ranked, 99, 3);
+  assert.equal(last.page, last.totalPages - 1);
+  assert.ok(last.items.length > 0);
 });
