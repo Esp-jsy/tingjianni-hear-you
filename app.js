@@ -989,6 +989,7 @@ function planFromForm() {
     profileId: state.selectedMatchId,
     note: String(formData.get("note") || "").trim().slice(0, 120),
     place: String(formData.get("place") || "校园书店"),
+    time: String(formData.get("time") || "时间待定"),
     duration: placeInput?.dataset.duration || "30 分钟",
     groupSize:
       state.profile.groupPreference === "pair" ? "一对一见" : "三四人小局",
@@ -1004,13 +1005,17 @@ function renderPlanResult(plan) {
   document.querySelectorAll('input[name="place"]').forEach((input) => {
     input.checked = input.value === plan.place;
   });
+  const timeSelect = document.querySelector("#plan-time");
+  if (timeSelect && [...timeSelect.options].some((option) => option.value === plan.time)) {
+    timeSelect.value = plan.time;
+  }
 
   document.querySelector("#plan-result-title").textContent =
     `${plan.place} · ${plan.duration}`;
 
   planResultContent.innerHTML = `
     <p>
-      ${planLabel(plan)}。双方看到同一张见面卡后，再确认是否出发。
+      ${planLabel(plan)}。约定时间：${escapeHtml(plan.time)}。双方看到同一张见面卡后，再确认是否出发。
       ${plan.checkIn ? "活动开始 30 分钟后只做一次轻柔提醒。" : "不发送自动提醒。"}
     </p>
     <ol class="itinerary">

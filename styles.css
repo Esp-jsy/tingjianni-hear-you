@@ -800,6 +800,7 @@ main {
 }
 
 .text-field input,
+.text-field select,
 .text-field textarea,
 .answer-field textarea {
   width: 100%;
@@ -809,9 +810,14 @@ main {
   color: var(--ink);
 }
 
-.text-field input {
+.text-field input,
+.text-field select {
   min-height: 52px;
   padding: 0 1rem;
+}
+
+.text-field select {
+  cursor: pointer;
 }
 
 .text-field textarea {
@@ -828,6 +834,7 @@ main {
 }
 
 .text-field input:focus,
+.text-field select:focus,
 .text-field textarea:focus,
 .answer-field textarea:focus {
   border-color: var(--brand);
