@@ -13,6 +13,7 @@
 - 注册、登录、退出与 30 天登录状态保持，账号页支持登录 / 注册切换、错误提示和已登录面板。
 - 双模式账号存储：`npm start` 使用 Node + SQLite（`data/hear-you.db`，scrypt 加盐哈希、HttpOnly Cookie）；GitHub Pages 等静态环境自动切换为浏览器 IndexedDB（PBKDF2 加盐哈希）。
 - 声音资料新增性别与可选个人照片：照片在浏览器端压缩到约 640px 后保存；登录状态下保存资料会同步到服务器 SQLite 的 `profiles` 表，换设备登录时按更新时间自动拉取或上传资料与照片，不同账号之间不会串用本机资料。
+- 新增 Node 20 兼容的 JSON 存储降级，并把 Node 服务部署为公网演示：<https://37ma2jljppxw76pz6e8.traesite.cn>（临时存储，实例重启后数据可能清空）。
 - 推荐页新增性别筛选（全部 / 女生 / 男生）与「换一批人选」：候选资料扩充到 8 位，每批展示 3 位，可循环查看。
 - 候选资料新增演示照片，点击推荐卡片或资料页的照片可放大查看，支持 Esc 与点击遮罩关闭。
 - 见面邀请双方确认：在“约一次轻松见面”确认路线后，会向对方发出邀请（可附一句留言），TA 可同意或婉拒并留下回复。本地 `npm start` 演示可切换到对方视角完成回应，GitHub Pages 线上演示不提供该入口、邀请保持等待状态；**正式环境下对方通知与回应需要服务器推送**，静态部署不会跨设备送达。邀请状态与双方消息保存在本地，刷新后不丢。
@@ -21,13 +22,17 @@
 
 ## 在线地址
 
-正式演示（GitHub Pages）：<https://esp-jsy.github.io/tingjianni-hear-you/>
+GitHub Pages 静态演示：<https://esp-jsy.github.io/tingjianni-hear-you/>
 
-注册 / 登录：<https://esp-jsy.github.io/tingjianni-hear-you/#auth>
+静态版注册 / 登录：<https://esp-jsy.github.io/tingjianni-hear-you/#auth>
+
+公网 Node 演示（支持跨设备同步）：<https://37ma2jljppxw76pz6e8.traesite.cn/>
+
+公网注册 / 登录：<https://37ma2jljppxw76pz6e8.traesite.cn/#auth>
 
 仓库：<https://github.com/Esp-jsy/tingjianni-hear-you>
 
-> GitHub Pages 上可直接注册和登录，账号保存在当前浏览器的 IndexedDB；通过 `npm start` 运行时会自动切换为服务器 SQLite 数据库，账号可跨浏览器使用。
+> GitHub Pages 上可直接注册和登录，账号保存在当前浏览器的 IndexedDB，无法跨设备同步；公网 Node 演示使用服务器 JSON 存储，换设备登录可同步资料与照片，但演示环境的临时存储可能在实例重启或重新部署后清空。本地 `npm start` 使用 SQLite（Node 22.5+）或自动降级为 JSON 文件存储（Node 20）。
 
 更新代码与部署方式见下方「部署说明」。
 
@@ -62,6 +67,7 @@ npm start
 - 账号保存在 SQLite 文件 `data/hear-you.db`，可用 `HEAR_YOU_DB` 指定其他路径；部署时要确保该目录可写并纳入备份。声音资料与照片保存在同一数据库的 `profiles` 表，登录后可跨设备恢复。
 - 建议放在 HTTPS 反向代理之后；登录 Cookie 为 HttpOnly + SameSite=Lax，需要同源访问，登录状态保持 30 天。
 - 该模式下账号存服务器数据库，可以跨浏览器、跨设备登录；但仍未提供邮箱验证、找回密码和登录限流。
+- 当前公网演示部署在 Trae 部署平台（Node 20 运行时）：<https://37ma2jljppxw76pz6e8.traesite.cn>。该环境没有持久磁盘，数据写入实例临时目录，重启或重新部署后可能清空；正式使用请改用带持久磁盘或外部数据库的部署。
 
 ## 界面预览
 
@@ -80,6 +86,8 @@ npm start
 打开 <http://127.0.0.1:4173>（默认端口，可用环境变量 `PORT` 修改）。
 
 首次运行会自动创建 SQLite 数据库 `data/hear-you.db`。注册的账号保存在其中，重启服务后仍可继续登录；也可以通过环境变量 `HEAR_YOU_DB` 指定其他数据库文件位置。数据库文件已被 `.gitignore` 排除，不会提交到仓库。
+
+Node.js 22.5+ 默认使用内置 `node:sqlite`；在 Node 20 等没有该模块的环境（包括当前公网演示）会自动降级为 JSON 文件存储，也可用 `HEAR_YOU_STORAGE=json` 强制启用。生产环境（`NODE_ENV=production`）默认把存储放在系统临时目录，实例重启后可能被清空。
 
 GitHub Pages 等纯静态环境没有 Node API，页面会自动改用浏览器 IndexedDB 保存账号；此时账号只存在于当前浏览器，换设备或清除站点数据后需要重新注册。
 

@@ -1,16 +1,18 @@
 import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { networkInterfaces } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DatabaseSync } from "node:sqlite";
 import { AuthError, SESSION_TTL_MS, createAuthStore } from "./auth.mjs";
 import { ProfileError, createProfileStore } from "./profiles.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || "0.0.0.0";
-const databasePath = process.env.HEAR_YOU_DB || join(root, "data", "hear-you.db");
+const isProduction = process.env.NODE_ENV === "production";
+const databasePath =
+  process.env.HEAR_YOU_DB ||
+  (isProduction ? join(tmpdir(), "hear-you", "hear-you.db") : join(root, "data", "hear-you.db"));
 const sessionCookie = "hear_you_session";
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -22,13 +24,38 @@ const mimeTypes = {
   ".webmanifest": "application/manifest+json"
 };
 
-if (databasePath !== ":memory:") {
-  mkdirSync(dirname(databasePath), { recursive: true });
+let DatabaseSync = null;
+if (process.env.HEAR_YOU_STORAGE !== "json") {
+  try {
+    ({ DatabaseSync } = await import("node:sqlite"));
+  } catch {
+    DatabaseSync = null;
+  }
 }
 
-const db = new DatabaseSync(databasePath);
-const auth = createAuthStore(db);
-const profiles = createProfileStore(db);
+let auth;
+let profiles;
+let storageMode = "sqlite";
+let storagePath = databasePath;
+
+if (DatabaseSync) {
+  if (databasePath !== ":memory:") {
+    mkdirSync(dirname(databasePath), { recursive: true });
+  }
+  const db = new DatabaseSync(databasePath);
+  auth = createAuthStore(db);
+  profiles = createProfileStore(db);
+} else {
+  const { createJsonStores } = await import("./json-store.mjs");
+  storageMode = "json";
+  storagePath =
+    databasePath === ":memory:"
+      ? join(tmpdir(), "hear-you", "hear-you.json")
+      : databasePath.replace(/\.db$/i, ".json");
+  const stores = createJsonStores(storagePath);
+  auth = stores.auth;
+  profiles = stores.profiles;
+}
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -215,7 +242,7 @@ createServer(async (request, response) => {
   }
 }).listen(port, host, () => {
   console.log(`Hear You is running at http://127.0.0.1:${port}`);
-  console.log(`Account database: ${databasePath}`);
+  console.log(`Account storage (${storageMode}): ${storagePath}`);
   const localAddresses = Object.values(networkInterfaces())
     .flat()
     .filter((address) => address?.family === "IPv4" && !address.internal)
