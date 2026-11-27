@@ -73,11 +73,13 @@ npm start
 
 ## 界面预览
 
-![听见你首页](docs/screenshots/home-desktop.png)
+![听见你首页](docs/screenshots/home-desktop.jpg)
 
-![透明匹配理由](docs/screenshots/matches-desktop.png)
+![透明匹配理由、性别筛选与换一批](docs/screenshots/matches-desktop.jpg)
 
-![声音资料详情](docs/screenshots/detail-desktop.png)
+![声音资料详情与照片放大](docs/screenshots/detail-desktop.jpg)
+
+![注册与登录](docs/screenshots/auth-desktop.jpg)
 
 ## 本地运行
 
