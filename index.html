@@ -285,7 +285,7 @@
           <div>
             <p class="eyebrow">安全副驾驶 · 第一次见面</p>
             <h1 id="plan-title">把“要不要见”变成一条清楚的路线</h1>
-            <p>只确认活动信息，不自动交换联系方式。双方都接受后才会生成见面卡。</p>
+            <p>只确认活动信息，不自动交换联系方式。确认路线后会向 TA 发出邀请，对方同意后见面才成立。</p>
           </div>
         </div>
 
@@ -337,6 +337,20 @@
               </label>
             </fieldset>
 
+            <fieldset class="field-group">
+              <legend>想对 TA 说的话（选填）</legend>
+              <label class="text-field">
+                <span>随邀请一起发送</span>
+                <textarea
+                  id="plan-note"
+                  name="note"
+                  rows="2"
+                  maxlength="120"
+                  placeholder="例如：周六下午都可以，书店见，看你方便。"
+                ></textarea>
+              </label>
+            </fieldset>
+
             <div class="form-actions">
               <button class="button button-ghost" type="button" data-nav="detail">返回资料</button>
               <button class="button button-primary" type="submit">确认这条轻松路线</button>
@@ -364,6 +378,7 @@
             </div>
           </div>
           <div id="plan-result-content"></div>
+          <div id="invite-section" class="invite-section" aria-live="polite" hidden></div>
           <div class="result-actions">
             <button id="speak-plan-button" class="button button-primary" type="button">朗读见面卡</button>
             <button class="button button-ghost" type="button" data-nav="matches">回到推荐</button>

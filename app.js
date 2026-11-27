@@ -16,6 +16,7 @@ import { createLocalAuth } from "./local-auth.js";
 
 const STORAGE_KEY = "tingjianni.prototype.v1";
 const DISPLAY_KEY = "tingjianni.display.v1";
+const INVITES_KEY = "tingjianni.invites.v1";
 const API_BASE = "./api";
 
 const views = [...document.querySelectorAll(".view")];
@@ -27,6 +28,7 @@ const matchList = document.querySelector("#match-list");
 const detailContent = document.querySelector("#detail-content");
 const planResult = document.querySelector("#plan-result");
 const planResultContent = document.querySelector("#plan-result-content");
+const inviteSection = document.querySelector("#invite-section");
 const exitStatus = document.querySelector("#exit-status");
 const profileError = document.querySelector("#profile-error");
 const recordError = document.querySelector("#record-error");
@@ -75,6 +77,21 @@ function loadStoredState() {
 }
 
 let state = loadStoredState();
+
+function loadInvites() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(INVITES_KEY) || "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveInvites() {
+  localStorage.setItem(INVITES_KEY, JSON.stringify(invites));
+}
+
+let invites = loadInvites();
 
 function persistState() {
   const profile = {
@@ -742,6 +759,7 @@ function planFromForm() {
   const placeInput = form.querySelector('input[name="place"]:checked');
   return {
     profileId: state.selectedMatchId,
+    note: String(formData.get("note") || "").trim().slice(0, 120),
     place: String(formData.get("place") || "校园书店"),
     duration: placeInput?.dataset.duration || "30 分钟",
     groupSize:
@@ -774,6 +792,7 @@ function renderPlanResult(plan) {
       <li><span>结束</span><strong>愿意继续再约</strong><small>${plan.route ? "查看无障碍路线与休息点" : "各自安全离开"}</small></li>
     </ol>
   `;
+  renderPlanInvite(plan);
   window.setTimeout(() => {
     planResult.focus({ preventScroll: true });
   }, 20);
@@ -784,9 +803,156 @@ function createPlan(event) {
   if (!state.selectedMatchId) return;
   state.plan = planFromForm();
   persistState();
+  const invite = sendInvite(state.plan);
   renderPlanResult(state.plan);
-  showToast("见面卡已生成。初赛原型仅在本机保存。");
+  showToast(`见面邀请已发送给 ${invite.profileName}，等 TA 同意或婉拒。`);
   planResult.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function sendInvite(plan) {
+  const match = DEMO_PROFILES.find((profile) => profile.id === plan.profileId);
+  invites[plan.profileId] = {
+    id: `invite-${Date.now()}`,
+    profileId: plan.profileId,
+    profileName: match ? match.name : "对方",
+    fromName: state.profile.name || "匿名用户",
+    plan,
+    status: "pending",
+    reply: "",
+    createdAt: Date.now(),
+    respondedAt: null
+  };
+  saveInvites();
+  return invites[plan.profileId];
+}
+
+function inviteStatusLabel(status) {
+  if (status === "accepted") return { label: "已同意", message: "已同意这次见面" };
+  if (status === "declined") return { label: "已婉拒", message: "婉拒了这次邀请" };
+  return { label: "等待回应", message: "邀请已发送，等待回应" };
+}
+
+function renderPlanInvite(plan) {
+  const invite = invites[plan.profileId];
+  if (!invite) {
+    inviteSection.hidden = true;
+    inviteSection.innerHTML = "";
+    return;
+  }
+
+  const meta = inviteStatusLabel(invite.status);
+  const responded = invite.status !== "pending";
+  const timeLabel = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(invite.createdAt);
+
+  inviteSection.hidden = false;
+  inviteSection.innerHTML = `
+    <div class="invite-status">
+      <span class="invite-dot" data-status="${invite.status}" aria-hidden="true"></span>
+      <div>
+        <p class="eyebrow">双方确认 · ${meta.label}</p>
+        <h3 tabindex="-1">${escapeHtml(invite.profileName)} ${escapeHtml(meta.message)}</h3>
+        <p class="invite-detail">
+          ${escapeHtml(invite.fromName)} 在 ${escapeHtml(timeLabel)} 发出邀请：${escapeHtml(planLabel(invite.plan))}。
+          ${
+            responded
+              ? "如需调整时间或地点，修改左侧安排后重新确认路线，会再次发送邀请。"
+              : "真实产品里 TA 会在自己的设备上收到通知；这个原型可以在下方切换到对方视角替 TA 回应。"
+          }
+        </p>
+      </div>
+    </div>
+    <div class="invite-messages">
+      <div class="invite-message mine">
+        <span>来自 ${escapeHtml(invite.fromName)} 的邀请附言</span>
+        <p>${escapeHtml(invite.plan.note || "（没有附言，直接看见面卡）")}</p>
+      </div>
+      <div class="invite-message theirs" ${responded ? "" : "hidden"}>
+        <span>${escapeHtml(invite.profileName)} 的回复</span>
+        <p>${escapeHtml(
+          invite.reply ||
+            `（${invite.status === "accepted" ? "同意了这次见面" : "婉拒了这次邀请"}，没有留言）`
+        )}</p>
+      </div>
+    </div>
+    <div class="invite-actions">
+      <button class="button ${responded ? "button-ghost" : "button-primary"}" type="button" data-invite-role="toggle">
+        ${responded ? "再看一次 TA 的回应（演示）" : "查看 TA 收到的通知（演示）"}
+      </button>
+    </div>
+    <div class="counterpart-view" data-invite-role="counterpart" hidden>
+      <p class="eyebrow">对方视角 · 原型演示</p>
+      <h3>以下是 ${escapeHtml(invite.profileName)} 收到的通知</h3>
+      <p>正式版中这条通知会实时推送到 TA 的设备；原型在本机模拟 TA 的选择。</p>
+      <div class="counterpart-card">
+        <strong>见面邀请</strong>
+        <p>${escapeHtml(invite.fromName)} 想约你：${escapeHtml(planLabel(invite.plan))}</p>
+        <p class="invite-detail">附言：${escapeHtml(invite.plan.note || "对方没有留言。")}</p>
+      </div>
+      ${
+        responded
+          ? `
+      <div class="form-actions">
+        <button class="button button-ghost" type="button" data-invite-role="close">收起</button>
+      </div>
+      `
+          : `
+      <label class="counterpart-reply">
+        <span>回复（选填）</span>
+        <textarea data-invite-role="reply" rows="2" maxlength="120" placeholder="例如：周六下午可以，书店见。"></textarea>
+      </label>
+      <div class="form-actions">
+        <button class="button button-primary" type="button" data-invite-role="accept">同意这次见面</button>
+        <button class="button button-ghost" type="button" data-invite-role="decline">婉拒这次邀请</button>
+        <button class="button button-ghost" type="button" data-invite-role="close">收起</button>
+      </div>
+      `
+      }
+    </div>
+  `;
+
+  const counterpart = inviteSection.querySelector("[data-invite-role='counterpart']");
+  const toggle = inviteSection.querySelector("[data-invite-role='toggle']");
+
+  toggle.addEventListener("click", () => {
+    counterpart.hidden = !counterpart.hidden;
+    if (!counterpart.hidden) {
+      counterpart.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      counterpart.querySelector("[data-invite-role='reply']")?.focus();
+    }
+  });
+
+  inviteSection.querySelector("[data-invite-role='close']").addEventListener("click", () => {
+    counterpart.hidden = true;
+    toggle.focus();
+  });
+
+  const respond = (status) => {
+    const reply =
+      inviteSection.querySelector("[data-invite-role='reply']")?.value.trim() || "";
+    invite.status = status;
+    invite.reply = reply;
+    invite.respondedAt = Date.now();
+    saveInvites();
+    renderPlanInvite(plan);
+    inviteSection.querySelector(".invite-status h3")?.focus();
+    showToast(
+      status === "accepted"
+        ? `${invite.profileName} 已同意见面${reply ? "，并留下了回复。" : "。"}`
+        : `${invite.profileName} 婉拒了这次邀请${reply ? "，并留下了回复。" : "。"}`
+    );
+  };
+
+  inviteSection
+    .querySelector("[data-invite-role='accept']")
+    ?.addEventListener("click", () => respond("accepted"));
+  inviteSection
+    .querySelector("[data-invite-role='decline']")
+    ?.addEventListener("click", () => respond("declined"));
 }
 
 function showSilentExit() {

@@ -753,6 +753,7 @@ main {
 }
 
 .text-field input,
+.text-field textarea,
 .answer-field textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -766,12 +767,21 @@ main {
   padding: 0 1rem;
 }
 
+.text-field textarea {
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
 .text-field input::placeholder,
+.text-field textarea::placeholder,
 .answer-field textarea::placeholder {
   color: color-mix(in srgb, var(--muted) 70%, transparent);
 }
 
 .text-field input:focus,
+.text-field textarea:focus,
 .answer-field textarea:focus {
   border-color: var(--brand);
 }
@@ -1735,6 +1745,187 @@ main {
   margin-top: 0.2rem;
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.invite-section {
+  margin-top: 1.5rem;
+  padding: clamp(1.1rem, 3vw, 1.6rem);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.invite-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.invite-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+}
+
+.invite-dot[data-status="pending"] {
+  background: var(--yellow);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--yellow) 18%, transparent);
+}
+
+.invite-dot[data-status="accepted"] {
+  background: var(--brand);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 14%, transparent);
+}
+
+.invite-dot[data-status="declined"] {
+  background: var(--muted);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--muted) 14%, transparent);
+}
+
+.invite-status h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
+}
+
+.invite-status h3:focus {
+  outline: none;
+}
+
+.invite-detail {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.invite-messages {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.invite-message {
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+}
+
+.invite-message p {
+  margin: 0;
+}
+
+.invite-message span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--brand);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.invite-message.mine {
+  background: var(--brand-soft);
+}
+
+.invite-message.theirs {
+  margin-left: clamp(0rem, 6vw, 2.5rem);
+  background: color-mix(in srgb, var(--ink) 7%, var(--surface-strong));
+}
+
+.invite-message.theirs span {
+  color: var(--muted);
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.1rem;
+}
+
+.counterpart-view {
+  margin-top: 1.2rem;
+  padding: clamp(1.1rem, 3vw, 1.6rem);
+  border-radius: var(--radius-lg);
+  background: var(--ink);
+  color: #fff;
+}
+
+.counterpart-view .eyebrow {
+  color: var(--yellow);
+}
+
+.counterpart-view h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.counterpart-view > p:not(.eyebrow) {
+  margin: 0.4rem 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+}
+
+.counterpart-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.84rem;
+}
+
+.counterpart-card strong {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.counterpart-card p {
+  margin: 0.2rem 0 0;
+}
+
+.counterpart-card .invite-detail {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.counterpart-reply {
+  display: block;
+  margin-top: 1rem;
+}
+
+.counterpart-reply span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.counterpart-reply textarea {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  resize: vertical;
+}
+
+.counterpart-view .form-actions {
+  margin-top: 1rem;
+}
+
+.counterpart-view .button-ghost {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+}
+
+.counterpart-view .button-ghost:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .safety-section {
