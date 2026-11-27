@@ -28,6 +28,10 @@
         <button type="button" data-nav="home" aria-current="page">首页</button>
         <button type="button" data-nav="matches">听见朋友</button>
         <button type="button" data-nav="safety">安全说明</button>
+        <button id="notifications-nav" type="button" data-nav="notifications" hidden>
+          通知
+          <span id="notification-badge" class="notification-badge" hidden>0</span>
+        </button>
         <button id="account-nav" type="button" data-nav="auth">登录 / 注册</button>
       </nav>
 
@@ -418,6 +422,17 @@
             <button class="button button-ghost" type="button" data-nav="matches">回到推荐</button>
           </div>
         </section>
+      </section>
+
+      <section id="view-notifications" class="view notifications-view" aria-labelledby="notifications-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">见面邀请 · 双方回应</p>
+            <h1 id="notifications-title">通知中心</h1>
+            <p>收到邀请后可以直接同意或婉拒；你发出的邀请有回应时，也会出现在这里。</p>
+          </div>
+        </div>
+        <div id="notifications-content" class="notifications-content" aria-live="polite"></div>
       </section>
 
       <section id="view-auth" class="view auth-view" aria-labelledby="auth-title" hidden>

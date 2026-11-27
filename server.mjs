@@ -6,6 +6,7 @@ import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AuthError, SESSION_TTL_MS, createAuthStore } from "./auth.mjs";
 import { ProfileError, createProfileStore } from "./profiles.mjs";
+import { InviteError, createInviteStore } from "./invites.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 4173);
@@ -37,6 +38,7 @@ if (process.env.HEAR_YOU_STORAGE !== "json") {
 
 let auth;
 let profiles;
+let invites;
 let storageMode = "sqlite";
 let storagePath = databasePath;
 
@@ -47,6 +49,7 @@ if (DatabaseSync) {
   const db = new DatabaseSync(databasePath);
   auth = createAuthStore(db);
   profiles = createProfileStore(db);
+  invites = createInviteStore(db);
 } else {
   const { createJsonStores, ensureSeeded } = await import("./json-store.mjs");
   storageMode = "json";
@@ -60,6 +63,7 @@ if (DatabaseSync) {
   const stores = createJsonStores(storagePath);
   auth = stores.auth;
   profiles = stores.profiles;
+  invites = stores.invites;
 }
 
 const adminToken = randomBytes(16).toString("hex");
@@ -186,7 +190,9 @@ async function handleApi(request, response, pathname) {
       users: raw.users || [],
       sessions: raw.sessions || [],
       profiles: raw.profiles || {},
-      nextUserId: raw.nextUserId || 1
+      invites: raw.invites || [],
+      nextUserId: raw.nextUserId || 1,
+      nextInviteId: raw.nextInviteId || 1
     });
     return;
   }
@@ -216,6 +222,49 @@ async function handleApi(request, response, pathname) {
     }
 
     throw new HttpError(405, "请求方法不被支持。");
+  }
+
+  if (pathname === "/api/invites") {
+    const user = auth.userForSession(readSessionToken(request));
+    if (!user) throw new AuthError(401, "请先登录后再查看邀请。");
+
+    if (request.method === "GET") {
+      sendJson(response, 200, invites.list(user.id));
+      return;
+    }
+
+    if (request.method === "POST") {
+      const body = await readJsonObject(request);
+      const invite = invites.create({
+        fromUserId: user.id,
+        toUserId: body.toUserId,
+        place: body.place,
+        time: body.time,
+        message: body.message
+      });
+      sendJson(response, 201, { invite });
+      return;
+    }
+
+    throw new HttpError(405, "请求方法不被支持。");
+  }
+
+  const inviteAction = pathname.match(/^\/api\/invites\/(\d+)\/(respond|read)$/);
+  if (inviteAction) {
+    const user = auth.userForSession(readSessionToken(request));
+    if (!user) throw new AuthError(401, "请先登录后再处理邀请。");
+    if (request.method !== "POST") throw new HttpError(405, "请求方法不被支持。");
+
+    const inviteId = Number(inviteAction[1]);
+    if (inviteAction[2] === "respond") {
+      const body = await readJsonObject(request);
+      const invite = invites.respond(user.id, inviteId, body.action, body.message);
+      sendJson(response, 200, { invite });
+      return;
+    }
+
+    sendJson(response, 200, { invite: invites.markRead(user.id, inviteId) });
+    return;
   }
 
   throw new HttpError(404, "接口不存在。");
@@ -284,7 +333,8 @@ createServer(async (request, response) => {
     serveStatic(request, response, url.pathname);
   } catch (error) {
     const isExpected =
-      error instanceof AuthError || error instanceof HttpError || error instanceof ProfileError;
+      error instanceof AuthError || error instanceof HttpError || error instanceof ProfileError ||
+      error instanceof InviteError;
     if (!isExpected) console.error(error);
     if (!response.headersSent) {
       sendJson(response, isExpected ? error.status : 500, {

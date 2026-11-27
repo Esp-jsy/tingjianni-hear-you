@@ -2439,6 +2439,154 @@ html.reduce-motion *::after {
   }
 }
 
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--signal);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.primary-nav button.has-notifications {
+  color: var(--brand);
+}
+
+.notifications-content {
+  margin-top: 1.8rem;
+}
+
+.notification-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.notification-group h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.notification-card {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.notification-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.notification-head .invite-dot {
+  margin-top: 0;
+}
+
+.notification-status {
+  margin-left: auto;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.notification-card[data-status="declined"] .notification-status {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+}
+
+.notification-plan {
+  margin: 0;
+  font-weight: 700;
+}
+
+.notification-time {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.notification-reply {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.notification-reply span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.notification-reply textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.notification-response {
+  margin-top: 0.35rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--brand-soft);
+}
+
+.notification-response span {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--brand-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.notification-response p {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.notification-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.notification-login {
+  max-width: 620px;
+}
+
+@media (max-width: 720px) {
+  .notification-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .notification-card .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

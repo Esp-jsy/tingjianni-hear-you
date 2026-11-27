@@ -113,6 +113,40 @@ test("json store seeds a fresh database from the previous deployment snapshot", 
   assert.equal(ensureSeeded(storePath, seedPath), false);
 });
 
+test("json store persists invites after reopening", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hear-you-invites-"));
+  const storePath = join(dir, "hear-you.json");
+  const stores = createJsonStores(storePath);
+  const a = stores.auth.register({
+    username: "json-a",
+    password: "password123",
+    displayName: "发起者"
+  }).user;
+  const b = stores.auth.register({
+    username: "json-b",
+    password: "password123",
+    displayName: "接收者"
+  }).user;
+
+  const invite = stores.invites.create({
+    fromUserId: a.id,
+    toUserId: b.id,
+    place: "城市书房",
+    time: "周六 15:00",
+    message: "一起读书吗？"
+  });
+  assert.equal(invite.status, "pending");
+
+  const reopened = createJsonStores(storePath);
+  const received = reopened.invites.list(b.id);
+  assert.equal(received.received.length, 1);
+  assert.equal(received.unread, 1);
+
+  const responded = reopened.invites.respond(b.id, invite.id, "accepted", "可以。");
+  assert.equal(responded.status, "accepted");
+  assert.equal(reopened.invites.list(a.id).unread, 1);
+});
+
 test("json store keeps data after reopening the file", () => {
   const { filePath, auth, profiles } = setup();
   const { user, token } = auth.register({ username: "linxia", password: "password123" });

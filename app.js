@@ -39,6 +39,9 @@ const profileError = document.querySelector("#profile-error");
 const recordError = document.querySelector("#record-error");
 const micSupport = document.querySelector("#mic-support");
 const accountNav = document.querySelector("#account-nav");
+const notificationsNav = document.querySelector("#notifications-nav");
+const notificationBadge = document.querySelector("#notification-badge");
+const notificationsContent = document.querySelector("#notifications-content");
 const accountPanel = document.querySelector("#account-panel");
 const authForms = document.querySelector("#auth-forms");
 const authServiceNote = document.querySelector("#auth-service-note");
@@ -82,6 +85,10 @@ let authUser = null;
 let authMode = "server";
 let localAuth = null;
 let sessionReady = Promise.resolve();
+let serverInvites = { received: [], sent: [], unread: 0 };
+let notificationsTimer = null;
+let notificationsLoading = false;
+let lastUnreadCount = 0;
 let liveCandidates = [];
 let candidatesLoading = false;
 let sessionSettled = false;
@@ -201,6 +208,7 @@ function mapAccountCandidates(items) {
       return {
         ...profile,
         id: `account-${item.id}`,
+        accountId: Number(item.id),
         name: profile.name || item.displayName,
         intro,
         isAccount: true
@@ -237,7 +245,7 @@ function selectedMatch() {
 
 function currentViewFromHash() {
   const requested = window.location.hash.replace("#", "");
-  const validViews = ["home", "profile", "record", "matches", "detail", "plan", "safety", "auth"];
+  const validViews = ["home", "profile", "record", "matches", "detail", "plan", "safety", "auth", "notifications"];
   const view = validViews.includes(requested) ? requested : "home";
 
   if (["matches", "detail", "plan"].includes(view) && !profileIsReady(state.profile)) {
@@ -294,6 +302,7 @@ function navigate(view, options = {}) {
   if (view === "detail") renderDetail();
   if (view === "plan") renderPlan();
   if (view === "auth") renderAccountView();
+  if (view === "notifications") openNotifications();
 
   if (focus) {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -1017,10 +1026,41 @@ function renderPlanResult(plan) {
   }, 20);
 }
 
-function createPlan(event) {
+async function createPlan(event) {
   event.preventDefault();
   if (!state.selectedMatchId) return;
   state.plan = planFromForm();
+  const match = allCandidates().find((profile) => profile.id === state.plan.profileId);
+
+  if (authMode === "server" && authUser && match?.accountId) {
+    try {
+      const payload = await requestJson(`${API_BASE}/invites`, {
+        method: "POST",
+        body: {
+          toUserId: match.accountId,
+          place: state.plan.place,
+          time: state.plan.time,
+          message: state.plan.note || ""
+        }
+      });
+      state.plan.serverInviteId = payload.invite.id;
+      persistState();
+      renderPlanResult(state.plan);
+      await loadServerInvites();
+      showToast(`邀请已发送给 ${match.name}，对方会在通知中心看到。`);
+      planResult.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    } catch (error) {
+      if (error.status === 401) {
+        showToast("请先登录后再向对方发送邀请。");
+        navigate("auth");
+      } else {
+        showToast(error.message || "邀请发送失败，请稍后再试。");
+      }
+      return;
+    }
+  }
+
   persistState();
   const invite = sendInvite(state.plan);
   renderPlanResult(state.plan);
@@ -1045,6 +1085,279 @@ function sendInvite(plan) {
   return invites[plan.profileId];
 }
 
+function renderServerInvite(invite, plan) {
+  const meta = inviteStatusLabel(invite.status);
+  const responded = invite.status !== "pending";
+  const timeLabel = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(invite.createdAt));
+
+  inviteSection.hidden = false;
+  inviteSection.innerHTML = `
+    <div class="invite-status">
+      <span class="invite-dot" data-status="${invite.status}" aria-hidden="true"></span>
+      <div>
+        <p class="eyebrow">双方确认 · ${meta.label}</p>
+        <h3 tabindex="-1">${escapeHtml(invite.toName)} ${escapeHtml(meta.message)}</h3>
+        <p class="invite-detail">
+          ${escapeHtml(timeLabel)} 发出邀请：${escapeHtml(plan.place)} · ${escapeHtml(plan.time)}。
+          ${
+            responded
+              ? "对方已在通知中心回应，结果同步在这里。"
+              : "邀请已进入对方的通知中心，同意或婉拒后这里会自动更新。"
+          }
+        </p>
+      </div>
+    </div>
+    <div class="invite-messages">
+      <div class="invite-message mine">
+        <span>你的邀请附言</span>
+        <p>${escapeHtml(invite.message || "（没有附言，直接看见面卡）")}</p>
+      </div>
+      <div class="invite-message theirs" ${responded ? "" : "hidden"}>
+        <span>${escapeHtml(invite.toName)} 的回复</span>
+        <p>${escapeHtml(
+          invite.responseMessage ||
+            `（${invite.status === "accepted" ? "同意了这次见面" : "婉拒了这次邀请"}，没有留言）`
+        )}</p>
+      </div>
+    </div>
+    <div class="invite-actions">
+      <button class="button button-ghost" type="button" data-nav="notifications">打开通知中心</button>
+    </div>
+  `;
+}
+
+function notificationTimeLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function updateNotificationBadge() {
+  if (!notificationsNav || !notificationBadge) return;
+  const visible = authMode === "server" && Boolean(authUser);
+  notificationsNav.hidden = !visible;
+  const count = visible ? serverInvites.unread : 0;
+  notificationBadge.textContent = count > 99 ? "99+" : String(count);
+  notificationBadge.hidden = count === 0;
+  notificationsNav.setAttribute("aria-label", count ? `通知，${count} 条未读` : "通知");
+
+  const onNotificationsView = !document.querySelector("#view-notifications").hidden;
+  if (visible && count > lastUnreadCount && !onNotificationsView && sessionSettled) {
+    showToast("收到新的见面通知，请打开通知中心查看。");
+  }
+  lastUnreadCount = count;
+}
+
+function notificationsDraftActive() {
+  if (!notificationsContent) return false;
+  return [...notificationsContent.querySelectorAll("[data-invite-reply]")].some(
+    (field) => field.value.trim() || document.activeElement === field
+  );
+}
+
+async function loadServerInvites() {
+  if (authMode !== "server" || !authUser) {
+    serverInvites = { received: [], sent: [], unread: 0 };
+    updateNotificationBadge();
+    return;
+  }
+  if (notificationsLoading) return;
+  notificationsLoading = true;
+
+  try {
+    const payload = await requestJson(`${API_BASE}/invites`);
+    serverInvites = {
+      received: Array.isArray(payload.received) ? payload.received : [],
+      sent: Array.isArray(payload.sent) ? payload.sent : [],
+      unread: Number(payload.unread) || 0
+    };
+    updateNotificationBadge();
+    if (state.plan?.serverInviteId && !planResult.hidden) {
+      renderPlanInvite(state.plan);
+    }
+    if (
+      !document.querySelector("#view-notifications").hidden &&
+      !notificationsDraftActive()
+    ) {
+      renderNotifications();
+    }
+  } catch {
+    // 网络波动时保留上一次的通知状态。
+  } finally {
+    notificationsLoading = false;
+  }
+}
+
+async function markAllNotificationsRead() {
+  const unread = [...serverInvites.received, ...serverInvites.sent].filter((item) => item.unread);
+  if (!unread.length) return;
+  await Promise.all(
+    unread.map((item) =>
+      requestJson(`${API_BASE}/invites/${item.id}/read`, { method: "POST" }).catch(() => null)
+    )
+  );
+  await loadServerInvites();
+}
+
+function renderNotifications() {
+  if (!notificationsContent) return;
+
+  if (authMode !== "server" || !authUser) {
+    notificationsContent.innerHTML = `
+      <div class="empty-state notification-login">
+        <h2>登录后查看见面通知</h2>
+        <p>通知保存在服务器，双方登录后都会收到见面邀请与回应。GitHub Pages 静态版没有服务器，暂不支持跨设备通知。</p>
+        <button class="button button-primary" type="button" data-nav="auth">去登录 / 注册</button>
+      </div>
+    `;
+    return;
+  }
+
+  const { received, sent } = serverInvites;
+  if (!received.length && !sent.length) {
+    notificationsContent.innerHTML = `
+      <div class="empty-state">
+        <h2>还没有见面通知</h2>
+        <p>在推荐里选择一位账号成员，生成轻松路线并发出邀请后，双方都会在这里收到通知。</p>
+        <button class="button button-ghost" type="button" data-nav="matches">去看推荐</button>
+      </div>
+    `;
+    return;
+  }
+
+  const receivedCards = received
+    .map((invite) => {
+      const meta = inviteStatusLabel(invite.status);
+      const pending = invite.status === "pending";
+      return `
+      <article class="notification-card" data-status="${invite.status}">
+        <div class="notification-head">
+          <span class="invite-dot" data-status="${invite.status}" aria-hidden="true"></span>
+          <strong>${escapeHtml(invite.fromName)} 邀请你见面</strong>
+          <span class="notification-status">${escapeHtml(meta.label)}</span>
+        </div>
+        <p class="notification-plan">${escapeHtml(invite.place)} · ${escapeHtml(invite.time)}</p>
+        <p class="invite-detail">附言：${escapeHtml(invite.message || "对方没有留言。")}</p>
+        <p class="notification-time">${escapeHtml(notificationTimeLabel(invite.createdAt))}</p>
+        ${
+          pending
+            ? `
+          <label class="notification-reply">
+            <span>回复（选填）</span>
+            <textarea data-invite-reply="${invite.id}" rows="2" maxlength="120" placeholder="例如：可以，我会提前十分钟到。"></textarea>
+          </label>
+          <div class="form-actions">
+            <button class="button button-primary" type="button" data-invite-action="accepted" data-invite-id="${invite.id}">同意这次见面</button>
+            <button class="button button-ghost" type="button" data-invite-action="declined" data-invite-id="${invite.id}">婉拒这次邀请</button>
+          </div>
+        `
+            : `
+          <div class="notification-response">
+            <span>你的回复</span>
+            <p>${escapeHtml(invite.responseMessage || `（${meta.message}，没有留言）`)}</p>
+          </div>
+        `
+        }
+      </article>
+    `;
+    })
+    .join("");
+
+  const sentCards = sent
+    .map((invite) => {
+      const meta = inviteStatusLabel(invite.status);
+      const responded = invite.status !== "pending";
+      return `
+      <article class="notification-card" data-status="${invite.status}">
+        <div class="notification-head">
+          <span class="invite-dot" data-status="${invite.status}" aria-hidden="true"></span>
+          <strong>你邀请 ${escapeHtml(invite.toName)}</strong>
+          <span class="notification-status">${escapeHtml(meta.label)}</span>
+        </div>
+        <p class="notification-plan">${escapeHtml(invite.place)} · ${escapeHtml(invite.time)}</p>
+        <p class="invite-detail">附言：${escapeHtml(invite.message || "没有附言。")}</p>
+        <p class="notification-time">${escapeHtml(notificationTimeLabel(invite.createdAt))}</p>
+        ${
+          responded
+            ? `<div class="notification-response">
+                 <span>${escapeHtml(invite.toName)} 的回复</span>
+                 <p>${escapeHtml(invite.responseMessage || `（${meta.message}，没有留言）`)}</p>
+               </div>`
+            : `<p class="invite-detail">等待对方在通知中心回应。</p>`
+        }
+      </article>
+    `;
+    })
+    .join("");
+
+  notificationsContent.innerHTML = `
+    <div class="notification-columns">
+      <section class="notification-group" aria-labelledby="received-invites-title">
+        <h2 id="received-invites-title">收到的邀请</h2>
+        ${receivedCards || `<p class="notification-empty">暂时没有收到邀请。</p>`}
+      </section>
+      <section class="notification-group" aria-labelledby="sent-invites-title">
+        <h2 id="sent-invites-title">我发出的邀请</h2>
+        ${sentCards || `<p class="notification-empty">还没有发出邀请。</p>`}
+      </section>
+    </div>
+  `;
+}
+
+async function openNotifications() {
+  renderNotifications();
+  if (authMode !== "server" || !authUser) return;
+  await loadServerInvites();
+  renderNotifications();
+  await markAllNotificationsRead();
+  if (!document.querySelector("#view-notifications").hidden) renderNotifications();
+}
+
+async function handleInviteResponse(inviteId, action) {
+  const reply =
+    document.querySelector(`[data-invite-reply="${inviteId}"]`)?.value.trim() || "";
+  try {
+    await requestJson(`${API_BASE}/invites/${inviteId}/respond`, {
+      method: "POST",
+      body: { action, message: reply }
+    });
+    showToast(
+      action === "accepted"
+        ? "已同意见面，发起者会收到通知。"
+        : "已婉拒邀请，发起者会收到通知。"
+    );
+    await loadServerInvites();
+    renderNotifications();
+  } catch (error) {
+    showToast(error.message || "回应失败，请稍后再试。");
+  }
+}
+
+function startNotificationPolling() {
+  stopNotificationPolling();
+  if (authMode !== "server" || !authUser) return;
+  notificationsTimer = window.setInterval(() => {
+    loadServerInvites();
+  }, 30000);
+}
+
+function stopNotificationPolling() {
+  if (notificationsTimer) {
+    window.clearInterval(notificationsTimer);
+    notificationsTimer = null;
+  }
+}
+
 function inviteStatusLabel(status) {
   if (status === "accepted") return { label: "已同意", message: "已同意这次见面" };
   if (status === "declined") return { label: "已婉拒", message: "婉拒了这次邀请" };
@@ -1052,6 +1365,26 @@ function inviteStatusLabel(status) {
 }
 
 function renderPlanInvite(plan) {
+  if (plan.serverInviteId) {
+    const serverInvite = serverInvites.sent.find((item) => item.id === plan.serverInviteId);
+    if (serverInvite) {
+      renderServerInvite(serverInvite, plan);
+      return;
+    }
+    inviteSection.hidden = false;
+    inviteSection.innerHTML = `
+      <div class="invite-status">
+        <span class="invite-dot" data-status="pending" aria-hidden="true"></span>
+        <div>
+          <p class="eyebrow">双方确认 · 同步中</p>
+          <h3 tabindex="-1">正在同步这条邀请的状态</h3>
+          <p class="invite-detail">登录后会自动从服务器刷新对方的回应。</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const invite = invites[plan.profileId];
   if (!invite) {
     inviteSection.hidden = true;
@@ -1235,7 +1568,9 @@ async function requestJson(path, { method = "GET", body } = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(payload.error || "请求失败，请稍后再试。");
+    const error = new Error(payload.error || "请求失败，请稍后再试。");
+    error.status = response.status;
+    throw error;
   }
   return payload;
 }
@@ -1427,6 +1762,8 @@ async function loadSession() {
   sessionSettled = true;
   updateAccountUI();
   await reconcileProfileWithServer();
+  await loadServerInvites();
+  startNotificationPolling();
   if (state.plan && !planResult.hidden) {
     renderPlanInvite(state.plan);
   }
@@ -1493,6 +1830,8 @@ async function handleLogin(event) {
     loginForm.reset();
     updateAccountUI();
     await reconcileProfileWithServer();
+    await loadServerInvites();
+    startNotificationPolling();
     showToast(`欢迎回来，${user.displayName}。`);
     navigate("home");
   } catch (error) {
@@ -1530,6 +1869,8 @@ async function handleRegister(event) {
       persistState();
     }
     updateAccountUI();
+    await loadServerInvites();
+    startNotificationPolling();
     showToast("账号已创建，并已自动登录。");
     navigate("profile");
   } catch (error) {
@@ -1553,6 +1894,10 @@ async function handleLogout() {
     // 即使请求失败，也先退出本机界面上的登录状态。
   }
   authUser = null;
+  stopNotificationPolling();
+  serverInvites = { received: [], sent: [], unread: 0 };
+  lastUnreadCount = 0;
+  updateNotificationBadge();
   updateAccountUI();
   showToast("已退出登录。");
   navigate("home");
@@ -1603,6 +1948,13 @@ function bindEvents() {
     if (navigationButton) {
       event.preventDefault();
       navigate(navigationButton.dataset.nav);
+      return;
+    }
+
+    const inviteAction = event.target.closest("[data-invite-action]");
+    if (inviteAction) {
+      event.preventDefault();
+      handleInviteResponse(inviteAction.dataset.inviteId, inviteAction.dataset.inviteAction);
       return;
     }
 

@@ -10,6 +10,7 @@ import { dirname } from "node:path";
 import { AuthError, SESSION_TTL_MS } from "./auth.mjs";
 import { normalizedProfile } from "./logic.js";
 import { ProfileError } from "./profiles.mjs";
+import { InviteError } from "./invites.mjs";
 
 const USERNAME_PATTERN = /^[\p{L}\p{N}_-]{2,20}$/u;
 const MAX_PASSWORD_LENGTH = 72;
@@ -60,10 +61,12 @@ export function createJsonStores(filePath) {
         users: Array.isArray(parsed.users) ? parsed.users : [],
         sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
         profiles: parsed.profiles && typeof parsed.profiles === "object" ? parsed.profiles : {},
-        nextUserId: Number(parsed.nextUserId) || 1
+        nextUserId: Number(parsed.nextUserId) || 1,
+        invites: Array.isArray(parsed.invites) ? parsed.invites : [],
+        nextInviteId: Number(parsed.nextInviteId) || 1
       };
     } catch {
-      return { users: [], sessions: [], profiles: {}, nextUserId: 1 };
+      return { users: [], sessions: [], profiles: {}, nextUserId: 1, invites: [], nextInviteId: 1 };
     }
   }
 
@@ -218,5 +221,128 @@ export function createJsonStores(filePath) {
     }
   };
 
-  return { auth, profiles };
+  const invites = {
+    create({ fromUserId, toUserId, place, time, message }) {
+      const recipient = data.users.find((user) => user.id === Number(toUserId));
+      if (!recipient) throw new InviteError(404, "没有找到要邀请的账号。");
+      if (Number(toUserId) === Number(fromUserId)) {
+        throw new InviteError(400, "不能邀请自己。");
+      }
+      const pending = data.invites.some(
+        (invite) =>
+          invite.status === "pending" &&
+          ((invite.fromUserId === Number(fromUserId) && invite.toUserId === Number(toUserId)) ||
+            (invite.fromUserId === Number(toUserId) && invite.toUserId === Number(fromUserId)))
+      );
+      if (pending) throw new InviteError(409, "你们之间已有待回应的邀请。");
+
+      const clean = (value, label, required = false) => {
+        const text = typeof value === "string" ? value.trim() : "";
+        if (required && !text) throw new InviteError(400, `请填写${label}。`);
+        if (text.length > 120) throw new InviteError(400, `${label}不能超过 120 个字符。`);
+        return text;
+      };
+
+      const invite = {
+        id: data.nextInviteId++,
+        fromUserId: Number(fromUserId),
+        toUserId: Number(toUserId),
+        place: clean(place, "见面地点", true),
+        time: clean(time, "见面时间", true),
+        message: clean(message, "附言"),
+        status: "pending",
+        responseMessage: "",
+        createdAt: new Date().toISOString(),
+        respondedAt: null,
+        recipientReadAt: null,
+        senderReadAt: null
+      };
+      data.invites.push(invite);
+      persist();
+      return mapJsonInvite(invite, fromUserId);
+    },
+
+    list(viewerId) {
+      const items = data.invites
+        .filter(
+          (invite) =>
+            invite.fromUserId === Number(viewerId) || invite.toUserId === Number(viewerId)
+        )
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || b.id - a.id)
+        .slice(0, 50)
+        .map((invite) => mapJsonInvite(invite, viewerId));
+      return {
+        received: items.filter((item) => item.direction === "received"),
+        sent: items.filter((item) => item.direction === "sent"),
+        unread: items.filter((item) => item.unread).length
+      };
+    },
+
+    respond(viewerId, inviteId, action, message) {
+      if (action !== "accepted" && action !== "declined") {
+        throw new InviteError(400, "请选择同意或婉拒。");
+      }
+      const invite = data.invites.find((item) => item.id === Number(inviteId));
+      if (!invite) throw new InviteError(404, "没有找到这条邀请。");
+      if (invite.toUserId !== Number(viewerId)) {
+        throw new InviteError(403, "只有收到邀请的人可以回应。");
+      }
+      if (invite.status !== "pending") throw new InviteError(409, "这条邀请已经回应过了。");
+      const reply = typeof message === "string" ? message.trim() : "";
+      if (reply.length > 120) throw new InviteError(400, "回复不能超过 120 个字符。");
+
+      const now = new Date().toISOString();
+      invite.status = action;
+      invite.responseMessage = reply;
+      invite.respondedAt = now;
+      invite.recipientReadAt = now;
+      persist();
+      return mapJsonInvite(invite, viewerId);
+    },
+
+    markRead(viewerId, inviteId) {
+      const invite = data.invites.find((item) => item.id === Number(inviteId));
+      if (!invite) throw new InviteError(404, "没有找到这条邀请。");
+      const isSender = invite.fromUserId === Number(viewerId);
+      const isRecipient = invite.toUserId === Number(viewerId);
+      if (!isSender && !isRecipient) throw new InviteError(404, "没有找到这条邀请。");
+
+      const now = new Date().toISOString();
+      if (isSender) {
+        invite.senderReadAt = now;
+      } else {
+        invite.recipientReadAt = now;
+      }
+      persist();
+      return mapJsonInvite(invite, viewerId);
+    }
+  };
+
+  function mapJsonInvite(invite, viewerId) {
+    const from = data.users.find((user) => user.id === invite.fromUserId);
+    const to = data.users.find((user) => user.id === invite.toUserId);
+    const direction = invite.toUserId === Number(viewerId) ? "received" : "sent";
+    const unread =
+      direction === "received"
+        ? invite.status === "pending" && !invite.recipientReadAt
+        : invite.status !== "pending" && !invite.senderReadAt;
+    return {
+      id: invite.id,
+      fromUserId: invite.fromUserId,
+      toUserId: invite.toUserId,
+      fromName: from ? from.displayName : "已注销用户",
+      toName: to ? to.displayName : "已注销用户",
+      place: invite.place,
+      time: invite.time,
+      message: invite.message,
+      status: invite.status,
+      responseMessage: invite.responseMessage,
+      createdAt: invite.createdAt,
+      respondedAt: invite.respondedAt,
+      direction,
+      unread
+    };
+  }
+
+  return { auth, profiles, invites };
 }
