@@ -1100,6 +1100,40 @@ main {
   font-size: 0.85rem;
 }
 
+.account-upload {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.account-upload-note {
+  max-width: 62ch;
+  margin: 0.35rem 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.account-upload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.8rem;
+}
+
+.account-upload-controls .text-field {
+  flex: 1 1 220px;
+}
+
+.account-upload-status {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
 .account-panel .form-actions {
   grid-column: 1 / -1;
   margin-top: 0.4rem;

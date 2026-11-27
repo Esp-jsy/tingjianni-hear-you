@@ -22,6 +22,7 @@ const STORAGE_KEY = "tingjianni.prototype.v1";
 const DISPLAY_KEY = "tingjianni.display.v1";
 const INVITES_KEY = "tingjianni.invites.v1";
 const API_BASE = "./api";
+const REMOTE_API_BASE = "https://37ma2jljppxw76pz6e8.traesite.cn/api";
 
 const views = [...document.querySelectorAll(".view")];
 const main = document.querySelector("main");
@@ -49,6 +50,10 @@ const loginError = document.querySelector("#login-error");
 const registerError = document.querySelector("#register-error");
 const accountName = document.querySelector("#account-name");
 const accountMeta = document.querySelector("#account-meta");
+const accountUpload = document.querySelector("#account-upload");
+const uploadPassword = document.querySelector("#upload-password");
+const uploadAccount = document.querySelector("#upload-account");
+const uploadStatus = document.querySelector("#upload-status");
 const photoPreview = document.querySelector("#photo-preview");
 const photoInput = document.querySelector("#photo-input");
 const photoChoose = document.querySelector("#photo-choose");
@@ -1261,9 +1266,60 @@ async function reconcileProfileWithServer() {
   }
 }
 
+async function handleAccountUpload() {
+  if (authMode !== "local" || !authUser) return;
+
+  const password = uploadPassword.value;
+  if (!password) {
+    uploadStatus.textContent = "请输入这个账号的密码。";
+    uploadPassword.focus();
+    return;
+  }
+
+  uploadStatus.textContent = "正在验证本地账号…";
+  try {
+    await localAuth.login({ username: authUser.username, password });
+  } catch {
+    uploadStatus.textContent = "密码不正确，无法上传。";
+    return;
+  }
+
+  uploadAccount.disabled = true;
+  uploadStatus.textContent = "正在上传到公网数据库…";
+  try {
+    const response = await fetch(`${REMOTE_API_BASE}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: authUser.username,
+        password,
+        displayName: authUser.displayName
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      uploadStatus.textContent =
+        "已上传到公网数据库，可在公网地址用同一账号密码登录。";
+      uploadPassword.value = "";
+      showToast("账号已上传到公网数据库。");
+    } else if (response.status === 409) {
+      uploadStatus.textContent =
+        "这个用户名已在公网数据库中，可直接在公网地址登录。";
+    } else {
+      uploadStatus.textContent = payload.error || "上传失败，请稍后再试。";
+    }
+  } catch {
+    uploadStatus.textContent = "无法连接公网服务器，请检查网络后重试。";
+  } finally {
+    uploadAccount.disabled = false;
+  }
+}
+
 function renderAccountView() {
   accountPanel.hidden = !authUser;
   authForms.hidden = Boolean(authUser);
+  accountUpload.hidden = !(authUser && authMode === "local");
 
   if (authMode === "local") {
     authServiceNote.hidden = false;
@@ -1547,6 +1603,13 @@ function bindEvents() {
   document.querySelector("#plan-form").addEventListener("submit", createPlan);
   document.querySelector("#exit-button").addEventListener("click", showSilentExit);
   document.querySelector("#logout-button").addEventListener("click", handleLogout);
+  uploadAccount.addEventListener("click", handleAccountUpload);
+  uploadPassword.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleAccountUpload();
+    }
+  });
   loginForm.addEventListener("submit", handleLogin);
   registerForm.addEventListener("submit", handleRegister);
   loginTab.addEventListener("click", () => setAuthMode("login"));

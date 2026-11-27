@@ -440,6 +440,30 @@
             <button class="button button-ghost" type="button" data-nav="profile">继续完善声音资料</button>
             <button id="logout-button" class="button button-ghost" type="button">退出登录</button>
           </div>
+
+          <div id="account-upload" class="account-upload" hidden>
+            <p class="eyebrow">迁移到公网数据库</p>
+            <p class="account-upload-note">
+              GitHub Pages 上的账号只保存在当前浏览器。输入同一密码验证后，会把账号写入公网服务器，
+              之后可在公网地址登录；资料与照片会在首次登录时自动同步。
+            </p>
+            <div class="account-upload-controls">
+              <label class="text-field">
+                <span>账号密码</span>
+                <input
+                  id="upload-password"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="72"
+                  placeholder="输入注册时使用的密码"
+                />
+              </label>
+              <button id="upload-account" class="button button-primary" type="button">
+                上传账号到数据库
+              </button>
+            </div>
+            <p id="upload-status" class="account-upload-status" role="status"></p>
+          </div>
         </div>
 
         <div id="auth-forms" class="auth-shell">
