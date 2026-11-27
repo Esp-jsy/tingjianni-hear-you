@@ -13,6 +13,7 @@ import {
   encodeClose,
   encodePing,
   encodePong,
+  encodeText,
   websocketAccept
 } from "./realtime.mjs";
 
@@ -409,6 +410,7 @@ server.on("upgrade", (request, socket, head) => {
   socket.setTimeout(0);
 
   realtime.add(socket, user.id);
+  socket.write(encodeText(JSON.stringify({ type: "realtime", event: "ready" })));
   const parse = createFrameParser({
     onPing: (payload) => socket.write(encodePong(payload)),
     onClose: () => {
@@ -436,7 +438,7 @@ server.on("upgrade", (request, socket, head) => {
     } catch {
       realtime.remove(socket);
     }
-  }, 30000);
+  }, 15000);
 
   const cleanup = () => {
     clearInterval(heartbeat);

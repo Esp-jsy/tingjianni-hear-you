@@ -1360,6 +1360,27 @@ function stopNotificationPolling() {
 
 let notificationSocket = null;
 let notificationSocketTimer = null;
+let notificationKeepaliveTimer = null;
+
+function stopNotificationKeepalive() {
+  if (notificationKeepaliveTimer) {
+    window.clearInterval(notificationKeepaliveTimer);
+    notificationKeepaliveTimer = null;
+  }
+}
+
+function startNotificationKeepalive(socket) {
+  stopNotificationKeepalive();
+  // 公网网关会在 30 秒没有客户端数据时断开连接，每 20 秒发一条保活消息。
+  notificationKeepaliveTimer = window.setInterval(() => {
+    if (notificationSocket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    try {
+      socket.send(JSON.stringify({ type: "keepalive" }));
+    } catch {
+      // 断开后由 close 事件负责重连。
+    }
+  }, 20000);
+}
 
 function notificationSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -1406,6 +1427,7 @@ function connectNotificationSocket() {
 
   socket.addEventListener("open", () => {
     if (notificationSocket !== socket) return;
+    startNotificationKeepalive(socket);
     // 实时通道可用时把轮询降到低频，只做兜底。
     startNotificationPolling(120000);
     loadServerInvites();
@@ -1423,6 +1445,7 @@ function connectNotificationSocket() {
   });
 
   socket.addEventListener("close", () => {
+    stopNotificationKeepalive();
     if (notificationSocket !== socket) return;
     notificationSocket = null;
     if (authMode === "server" && authUser) {
@@ -1441,6 +1464,7 @@ function connectNotificationSocket() {
 }
 
 function closeNotificationSocket() {
+  stopNotificationKeepalive();
   if (notificationSocketTimer) {
     window.clearTimeout(notificationSocketTimer);
     notificationSocketTimer = null;
