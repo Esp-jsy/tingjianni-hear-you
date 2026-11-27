@@ -28,6 +28,7 @@
         <button type="button" data-nav="home" aria-current="page">首页</button>
         <button type="button" data-nav="matches">听见朋友</button>
         <button type="button" data-nav="safety">安全说明</button>
+        <button id="account-nav" type="button" data-nav="auth">登录 / 注册</button>
       </nav>
 
       <div class="display-tools" aria-label="显示设置">
@@ -368,6 +369,135 @@
             <button class="button button-ghost" type="button" data-nav="matches">回到推荐</button>
           </div>
         </section>
+      </section>
+
+      <section id="view-auth" class="view auth-view" aria-labelledby="auth-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">账号 · 下次回来，还能继续</p>
+            <h1 id="auth-title">注册一个账号，或用它登录</h1>
+            <p>账号只用于登录识别，不会公开你的声音与回答。</p>
+          </div>
+        </div>
+
+        <div id="account-panel" class="account-panel" hidden>
+          <div class="account-avatar" aria-hidden="true">声</div>
+          <div>
+            <p class="eyebrow">已登录</p>
+            <h2 id="account-name">—</h2>
+            <p id="account-meta" class="account-meta"></p>
+          </div>
+          <div class="form-actions">
+            <button class="button button-ghost" type="button" data-nav="profile">继续完善声音资料</button>
+            <button id="logout-button" class="button button-ghost" type="button">退出登录</button>
+          </div>
+        </div>
+
+        <div id="auth-forms" class="auth-shell">
+          <div class="auth-tabs" role="tablist" aria-label="选择登录或注册">
+            <button
+              id="login-tab"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="login-form"
+              tabindex="0"
+            >登录</button>
+            <button
+              id="register-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="register-form"
+              tabindex="-1"
+            >注册</button>
+          </div>
+
+          <form id="login-form" class="form-shell auth-form" aria-labelledby="login-tab" novalidate>
+            <div class="field-group">
+              <label class="text-field">
+                <span>用户名</span>
+                <input
+                  id="login-username"
+                  name="username"
+                  type="text"
+                  autocomplete="username"
+                  maxlength="20"
+                  required
+                />
+              </label>
+            </div>
+            <div class="field-group">
+              <label class="text-field">
+                <span>密码</span>
+                <input
+                  id="login-password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  maxlength="72"
+                  required
+                />
+              </label>
+            </div>
+            <p id="login-error" class="form-error" role="alert" tabindex="-1" hidden></p>
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">登录</button>
+            </div>
+          </form>
+
+          <form id="register-form" class="form-shell auth-form" aria-labelledby="register-tab" novalidate hidden>
+            <div class="field-group">
+              <label class="text-field">
+                <span>用户名</span>
+                <input
+                  id="register-username"
+                  name="username"
+                  type="text"
+                  autocomplete="username"
+                  maxlength="20"
+                  placeholder="例如：linxia"
+                  required
+                />
+                <small class="field-hint">2～20 个字符 · 可用中文、字母、数字、下划线或短横线</small>
+              </label>
+            </div>
+            <div class="field-group">
+              <label class="text-field">
+                <span>昵称（选填）</span>
+                <input
+                  id="register-display-name"
+                  name="displayName"
+                  type="text"
+                  autocomplete="nickname"
+                  maxlength="20"
+                  placeholder="别人怎么称呼你"
+                />
+              </label>
+            </div>
+            <div class="field-group">
+              <label class="text-field">
+                <span>密码</span>
+                <input
+                  id="register-password"
+                  name="password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="8"
+                  maxlength="72"
+                  required
+                />
+                <small class="field-hint">至少 8 位 · 密码仅以加盐哈希形式保存</small>
+              </label>
+            </div>
+            <p id="register-error" class="form-error" role="alert" tabindex="-1" hidden></p>
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">创建账号并继续</button>
+            </div>
+          </form>
+        </div>
+
+        <p id="auth-service-note" class="auth-service-note" role="status" hidden></p>
       </section>
     </main>
 

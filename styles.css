@@ -905,6 +905,150 @@ main {
   justify-content: space-between;
 }
 
+#account-nav.signed-in {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.auth-shell {
+  width: min(620px, 100%);
+  margin: 0 auto;
+}
+
+.auth-tabs {
+  display: inline-flex;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.auth-tabs [role="tab"] {
+  min-height: 44px;
+  padding: 0.45rem 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.auth-tabs [role="tab"]:hover {
+  color: var(--ink);
+}
+
+.auth-tabs [role="tab"][aria-selected="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.auth-form {
+  display: grid;
+  gap: 1.75rem;
+  margin: 0;
+}
+
+.auth-form .field-group {
+  padding: 0;
+  border: 0;
+}
+
+.auth-form .text-field {
+  gap: 0.5rem;
+}
+
+.auth-form .field-hint {
+  position: relative;
+  margin-top: 0.1rem;
+  padding-left: 0.85rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.auth-form .field-hint::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 0.1rem;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.auth-form .form-error {
+  margin: 0;
+}
+
+.auth-form .form-actions {
+  margin-top: 0.25rem;
+  justify-content: flex-start;
+}
+
+.auth-service-note {
+  width: min(620px, 100%);
+  margin: 1rem auto 0;
+  padding: 0.8rem 1rem;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--brand-soft) 55%, transparent);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.account-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem 1.2rem;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.account-panel h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.account-panel .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.account-meta {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.account-panel .form-actions {
+  grid-column: 1 / -1;
+  margin-top: 0.4rem;
+  justify-content: flex-start;
+}
+
 .record-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.65fr);

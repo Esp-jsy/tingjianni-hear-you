@@ -12,9 +12,11 @@ import {
   profileIsReady,
   rankProfiles
 } from "./logic.js";
+import { createLocalAuth } from "./local-auth.js";
 
 const STORAGE_KEY = "tingjianni.prototype.v1";
 const DISPLAY_KEY = "tingjianni.display.v1";
+const API_BASE = "./api";
 
 const views = [...document.querySelectorAll(".view")];
 const main = document.querySelector("main");
@@ -29,6 +31,18 @@ const exitStatus = document.querySelector("#exit-status");
 const profileError = document.querySelector("#profile-error");
 const recordError = document.querySelector("#record-error");
 const micSupport = document.querySelector("#mic-support");
+const accountNav = document.querySelector("#account-nav");
+const accountPanel = document.querySelector("#account-panel");
+const authForms = document.querySelector("#auth-forms");
+const authServiceNote = document.querySelector("#auth-service-note");
+const loginForm = document.querySelector("#login-form");
+const registerForm = document.querySelector("#register-form");
+const loginTab = document.querySelector("#login-tab");
+const registerTab = document.querySelector("#register-tab");
+const loginError = document.querySelector("#login-error");
+const registerError = document.querySelector("#register-error");
+const accountName = document.querySelector("#account-name");
+const accountMeta = document.querySelector("#account-meta");
 
 const mediaRecorderSupported =
   "MediaRecorder" in window && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -38,6 +52,10 @@ const recordedUrls = new Map();
 let activeRecording = null;
 let matchFilter = "all";
 let toastTimer;
+let authUser = null;
+let authMode = "server";
+let localAuth = null;
+let sessionReady = Promise.resolve();
 
 function loadStoredState() {
   try {
@@ -102,7 +120,7 @@ function selectedMatch() {
 
 function currentViewFromHash() {
   const requested = window.location.hash.replace("#", "");
-  const validViews = ["home", "profile", "record", "matches", "detail", "plan", "safety"];
+  const validViews = ["home", "profile", "record", "matches", "detail", "plan", "safety", "auth"];
   const view = validViews.includes(requested) ? requested : "home";
 
   if (["matches", "detail", "plan"].includes(view) && !profileIsReady(state.profile)) {
@@ -153,6 +171,7 @@ function navigate(view, options = {}) {
   if (view === "matches") renderMatches();
   if (view === "detail") renderDetail();
   if (view === "plan") renderPlan();
+  if (view === "auth") renderAccountView();
 
   if (focus) {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -802,6 +821,213 @@ function startQuickDemo(targetView = "matches") {
   showToast("已载入演示资料。点击“听见周予安”继续体验。");
 }
 
+async function requestJson(path, { method = "GET", body } = {}) {
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error || "请求失败，请稍后再试。");
+  }
+  return payload;
+}
+
+function authErrorMessage(error) {
+  if (error instanceof TypeError) {
+    return "无法连接账号服务，请确认已通过 npm start 启动本地服务器。";
+  }
+  return error.message || "请求失败，请稍后再试。";
+}
+
+function renderAccountView() {
+  accountPanel.hidden = !authUser;
+  authForms.hidden = Boolean(authUser);
+
+  if (authMode === "local") {
+    authServiceNote.hidden = false;
+    authServiceNote.textContent =
+      "当前为 GitHub Pages 静态演示：账号保存在此浏览器的 IndexedDB 中，换设备或清除浏览器数据后需要重新注册。";
+  } else if (authMode === "unavailable") {
+    authServiceNote.hidden = false;
+    authServiceNote.textContent =
+      "当前浏览器无法使用本地账号存储，请通过 npm start 启动服务器，或换用现代浏览器后重试。";
+  } else {
+    authServiceNote.hidden = true;
+  }
+
+  if (!authUser) return;
+
+  accountName.textContent = authUser.displayName;
+  const registeredAt = new Date(authUser.createdAt);
+  const dateLabel = Number.isNaN(registeredAt.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("zh-CN", { dateStyle: "long" }).format(registeredAt);
+  const storageLabel = authMode === "local" ? " · 保存在当前浏览器" : "";
+  accountMeta.textContent = dateLabel
+    ? `用户名：${authUser.username} · 注册于 ${dateLabel}${storageLabel}`
+    : `用户名：${authUser.username}${storageLabel}`;
+}
+
+function updateAccountUI() {
+  accountNav.textContent = authUser ? "我的账号" : "登录 / 注册";
+  accountNav.classList.toggle("signed-in", Boolean(authUser));
+  renderAccountView();
+}
+
+async function loadSession() {
+  try {
+    const payload = await requestJson(`${API_BASE}/me`);
+    if (!payload || !("user" in payload)) throw new Error("账号接口不可用");
+    authMode = "server";
+    authUser = payload.user || null;
+  } catch {
+    try {
+      localAuth = createLocalAuth();
+      authMode = "local";
+      authUser = await localAuth.currentUser();
+    } catch {
+      localAuth = null;
+      authMode = "unavailable";
+      authUser = null;
+    }
+  }
+  updateAccountUI();
+}
+
+async function submitAuthRequest(path, runLocal, body) {
+  await sessionReady;
+
+  if (authMode === "local" && localAuth) {
+    return runLocal(localAuth);
+  }
+  if (authMode === "unavailable") {
+    throw new Error("当前浏览器无法使用本地账号存储，请通过 npm start 启动服务器后再试。");
+  }
+  return requestJson(path, { method: "POST", body });
+}
+
+function setAuthMode(mode, { focusTab = false } = {}) {
+  const isLogin = mode === "login";
+  loginTab.setAttribute("aria-selected", String(isLogin));
+  loginTab.tabIndex = isLogin ? 0 : -1;
+  registerTab.setAttribute("aria-selected", String(!isLogin));
+  registerTab.tabIndex = isLogin ? -1 : 0;
+  loginForm.hidden = !isLogin;
+  registerForm.hidden = isLogin;
+  loginError.hidden = true;
+  registerError.hidden = true;
+
+  if (focusTab) (isLogin ? loginTab : registerTab).focus();
+}
+
+function setSubmitBusy(form, busy, label) {
+  const button = form.querySelector('button[type="submit"]');
+  if (!button) return;
+
+  if (busy) {
+    button.dataset.idleLabel = button.textContent;
+    button.textContent = label;
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.idleLabel || button.textContent;
+    button.disabled = false;
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  loginError.hidden = true;
+  if (!loginForm.reportValidity()) return;
+
+  const formData = new FormData(loginForm);
+  const credentials = {
+    username: formData.get("username"),
+    password: formData.get("password")
+  };
+  setSubmitBusy(loginForm, true, "正在登录…");
+  try {
+    const { user } = await submitAuthRequest(
+      `${API_BASE}/login`,
+      (auth) => auth.login(credentials),
+      credentials
+    );
+    authUser = user;
+    loginForm.reset();
+    updateAccountUI();
+    showToast(`欢迎回来，${user.displayName}。`);
+    navigate("home");
+  } catch (error) {
+    loginError.textContent = authErrorMessage(error);
+    loginError.hidden = false;
+    loginError.focus();
+  } finally {
+    setSubmitBusy(loginForm, false);
+  }
+}
+
+async function handleRegister(event) {
+  event.preventDefault();
+  registerError.hidden = true;
+  if (!registerForm.reportValidity()) return;
+
+  const formData = new FormData(registerForm);
+  const registration = {
+    username: formData.get("username"),
+    password: formData.get("password"),
+    displayName: formData.get("displayName")
+  };
+  setSubmitBusy(registerForm, true, "正在创建…");
+  try {
+    const { user } = await submitAuthRequest(
+      `${API_BASE}/register`,
+      (auth) => auth.register(registration),
+      registration
+    );
+    authUser = user;
+    registerForm.reset();
+    if (!state.profile.name) {
+      state.profile.name = user.displayName;
+      persistState();
+    }
+    updateAccountUI();
+    showToast("账号已创建，并已自动登录。");
+    navigate("profile");
+  } catch (error) {
+    registerError.textContent = authErrorMessage(error);
+    registerError.hidden = false;
+    registerError.focus();
+  } finally {
+    setSubmitBusy(registerForm, false);
+  }
+}
+
+async function handleLogout() {
+  try {
+    await sessionReady;
+    if (authMode === "local" && localAuth) {
+      await localAuth.logout();
+    } else if (authMode === "server") {
+      await requestJson(`${API_BASE}/logout`, { method: "POST" });
+    }
+  } catch {
+    // 即使请求失败，也先退出本机界面上的登录状态。
+  }
+  authUser = null;
+  updateAccountUI();
+  showToast("已退出登录。");
+  navigate("home");
+}
+
 function setupDisplayPreferences() {
   let preferences = {};
   try {
@@ -864,6 +1090,17 @@ function bindEvents() {
   document.querySelector("#start-button").addEventListener("click", () => navigate("profile"));
   document.querySelector("#plan-form").addEventListener("submit", createPlan);
   document.querySelector("#exit-button").addEventListener("click", showSilentExit);
+  document.querySelector("#logout-button").addEventListener("click", handleLogout);
+  loginForm.addEventListener("submit", handleLogin);
+  registerForm.addEventListener("submit", handleRegister);
+  loginTab.addEventListener("click", () => setAuthMode("login"));
+  registerTab.addEventListener("click", () => setAuthMode("register"));
+  document.querySelector(".auth-tabs").addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const nextMode = loginTab.getAttribute("aria-selected") === "true" ? "register" : "login";
+    setAuthMode(nextMode, { focusTab: true });
+  });
 
   document.querySelector("#speak-plan-button").addEventListener("click", () => {
     const match = selectedMatch();
@@ -900,6 +1137,7 @@ function init() {
   setupDisplayPreferences();
   bindEvents();
   renderPromptList();
+  sessionReady = loadSession();
   const query = new URLSearchParams(window.location.search);
   if (query.get("demo") === "1") {
     startQuickDemo(query.get("view") || "matches");
