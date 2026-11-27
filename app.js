@@ -1343,12 +1343,12 @@ async function handleInviteResponse(inviteId, action) {
   }
 }
 
-function startNotificationPolling() {
+function startNotificationPolling(interval = 30000) {
   stopNotificationPolling();
   if (authMode !== "server" || !authUser) return;
   notificationsTimer = window.setInterval(() => {
     loadServerInvites();
-  }, 30000);
+  }, interval);
 }
 
 function stopNotificationPolling() {
@@ -1357,6 +1357,111 @@ function stopNotificationPolling() {
     notificationsTimer = null;
   }
 }
+
+let notificationSocket = null;
+let notificationSocketTimer = null;
+
+function notificationSocketUrl() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws`;
+}
+
+function scheduleNotificationReconnect() {
+  if (notificationSocketTimer) return;
+  notificationSocketTimer = window.setTimeout(() => {
+    notificationSocketTimer = null;
+    connectNotificationSocket();
+  }, 5000);
+}
+
+async function handleRealtimeInviteEvent(payload) {
+  await loadServerInvites();
+  if (payload.event === "created") {
+    showToast(`${payload.fromName || "有人"} 邀请你见面，去通知中心看看。`);
+  } else if (payload.event === "responded") {
+    showToast(
+      `${payload.toName || "对方"}${payload.status === "accepted" ? "同意了这次见面。" : "婉拒了这次邀请。"}`
+    );
+  }
+}
+
+function connectNotificationSocket() {
+  if (authMode !== "server" || !authUser) return;
+  if (
+    notificationSocket &&
+    (notificationSocket.readyState === WebSocket.OPEN ||
+      notificationSocket.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+
+  let socket;
+  try {
+    socket = new WebSocket(notificationSocketUrl());
+  } catch {
+    scheduleNotificationReconnect();
+    return;
+  }
+  notificationSocket = socket;
+
+  socket.addEventListener("open", () => {
+    if (notificationSocket !== socket) return;
+    // 实时通道可用时把轮询降到低频，只做兜底。
+    startNotificationPolling(120000);
+    loadServerInvites();
+  });
+
+  socket.addEventListener("message", (event) => {
+    if (notificationSocket !== socket) return;
+    let payload;
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (payload && payload.type === "invites") handleRealtimeInviteEvent(payload);
+  });
+
+  socket.addEventListener("close", () => {
+    if (notificationSocket !== socket) return;
+    notificationSocket = null;
+    if (authMode === "server" && authUser) {
+      startNotificationPolling(30000);
+      scheduleNotificationReconnect();
+    }
+  });
+
+  socket.addEventListener("error", () => {
+    try {
+      socket.close();
+    } catch {
+      // 连接已断开时忽略。
+    }
+  });
+}
+
+function closeNotificationSocket() {
+  if (notificationSocketTimer) {
+    window.clearTimeout(notificationSocketTimer);
+    notificationSocketTimer = null;
+  }
+  const socket = notificationSocket;
+  notificationSocket = null;
+  if (socket) {
+    try {
+      socket.close();
+    } catch {
+      // 连接已断开时忽略。
+    }
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && authMode === "server" && authUser) {
+    connectNotificationSocket();
+  }
+});
+
 
 function inviteStatusLabel(status) {
   if (status === "accepted") return { label: "已同意", message: "已同意这次见面" };
@@ -1764,6 +1869,7 @@ async function loadSession() {
   await reconcileProfileWithServer();
   await loadServerInvites();
   startNotificationPolling();
+  connectNotificationSocket();
   if (state.plan && !planResult.hidden) {
     renderPlanInvite(state.plan);
   }
@@ -1894,6 +2000,7 @@ async function handleLogout() {
     // 即使请求失败，也先退出本机界面上的登录状态。
   }
   authUser = null;
+  closeNotificationSocket();
   stopNotificationPolling();
   serverInvites = { received: [], sent: [], unread: 0 };
   lastUnreadCount = 0;

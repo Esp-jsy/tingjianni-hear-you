@@ -7,6 +7,14 @@ import { fileURLToPath } from "node:url";
 import { AuthError, SESSION_TTL_MS, createAuthStore } from "./auth.mjs";
 import { ProfileError, createProfileStore } from "./profiles.mjs";
 import { InviteError, createInviteStore } from "./invites.mjs";
+import {
+  createFrameParser,
+  createRealtimeHub,
+  encodeClose,
+  encodePing,
+  encodePong,
+  websocketAccept
+} from "./realtime.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 4173);
@@ -67,6 +75,7 @@ if (DatabaseSync) {
 }
 
 const adminToken = randomBytes(16).toString("hex");
+const realtime = createRealtimeHub();
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -242,6 +251,14 @@ async function handleApi(request, response, pathname) {
         time: body.time,
         message: body.message
       });
+      realtime.notify(invite.toUserId, {
+        type: "invites",
+        event: "created",
+        inviteId: invite.id,
+        fromName: invite.fromName,
+        place: invite.place,
+        time: invite.time
+      });
       sendJson(response, 201, { invite });
       return;
     }
@@ -259,6 +276,19 @@ async function handleApi(request, response, pathname) {
     if (inviteAction[2] === "respond") {
       const body = await readJsonObject(request);
       const invite = invites.respond(user.id, inviteId, body.action, body.message);
+      realtime.notify(invite.fromUserId, {
+        type: "invites",
+        event: "responded",
+        inviteId: invite.id,
+        status: invite.status,
+        toName: invite.toName,
+        responseMessage: invite.responseMessage
+      });
+      realtime.notify(invite.toUserId, {
+        type: "invites",
+        event: "updated",
+        inviteId: invite.id
+      });
       sendJson(response, 200, { invite });
       return;
     }
@@ -304,7 +334,7 @@ function serveStatic(request, response, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
@@ -344,7 +374,80 @@ createServer(async (request, response) => {
       response.end();
     }
   }
-}).listen(port, host, () => {
+});
+
+server.on("upgrade", (request, socket, head) => {
+  socket.on("error", () => {});
+
+  let pathname = "";
+  try {
+    pathname = new URL(request.url || "/", "http://localhost").pathname;
+  } catch {
+    socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+    return;
+  }
+
+  if (pathname !== "/ws") {
+    socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+    return;
+  }
+
+  const key = request.headers["sec-websocket-key"];
+  const user = auth.userForSession(readSessionToken(request));
+  if (!key || !user) {
+    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+    return;
+  }
+
+  socket.write(
+    "HTTP/1.1 101 Switching Protocols\r\n" +
+      "Upgrade: websocket\r\n" +
+      "Connection: Upgrade\r\n" +
+      `Sec-WebSocket-Accept: ${websocketAccept(key)}\r\n\r\n`
+  );
+  socket.setNoDelay(true);
+  socket.setTimeout(0);
+
+  realtime.add(socket, user.id);
+  const parse = createFrameParser({
+    onPing: (payload) => socket.write(encodePong(payload)),
+    onClose: () => {
+      socket.write(encodeClose(1000));
+      socket.end();
+    }
+  });
+
+  const handleChunk = (chunk) => {
+    try {
+      parse(chunk);
+    } catch {
+      realtime.remove(socket);
+      socket.destroy();
+    }
+  };
+
+  if (head && head.length) handleChunk(head);
+  socket.on("data", handleChunk);
+
+  const heartbeat = setInterval(() => {
+    if (socket.destroyed) return;
+    try {
+      socket.write(encodePing());
+    } catch {
+      realtime.remove(socket);
+    }
+  }, 30000);
+
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    realtime.remove(socket);
+  };
+  socket.on("close", cleanup);
+  socket.on("end", cleanup);
+  socket.on("error", cleanup);
+});
+
+server.listen(port, host, () => {
   console.log(`Hear You is running at http://127.0.0.1:${port}`);
   console.log(`Account storage (${storageMode}): ${storagePath}`);
   console.log(`Backup key: ${adminToken}`);
