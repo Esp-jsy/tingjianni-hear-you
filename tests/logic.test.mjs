@@ -9,6 +9,7 @@ import {
   paginateProfiles,
   planLabel,
   profileIsReady,
+  profileSyncAction,
   rankProfiles,
   scoreProfile
 } from "../logic.js";
@@ -118,4 +119,82 @@ test("every demo profile has a portrait photo for the enlarge preview", () => {
       /^https:\/\/trae-api-cn\.mchost\.guru\/api\/ide\/v1\/text_to_image\?prompt=/
     );
   });
+});
+
+test("profileSyncAction pulls the server profile for a new device", () => {
+  assert.equal(
+    profileSyncAction({
+      localReady: false,
+      localOwner: null,
+      currentOwner: "linxia",
+      localUpdatedAt: null,
+      remoteUpdatedAt: "2026-11-27T10:00:00.000Z",
+      hasRemote: true
+    }),
+    "pull"
+  );
+
+  assert.equal(
+    profileSyncAction({
+      localReady: true,
+      localOwner: "linxia",
+      currentOwner: "linxia",
+      localUpdatedAt: "2026-11-27T09:00:00.000Z",
+      remoteUpdatedAt: "2026-11-27T10:00:00.000Z",
+      hasRemote: true
+    }),
+    "pull"
+  );
+});
+
+test("profileSyncAction pushes newer local edits and claims guest profiles", () => {
+  assert.equal(
+    profileSyncAction({
+      localReady: true,
+      localOwner: "linxia",
+      currentOwner: "linxia",
+      localUpdatedAt: "2026-11-27T11:00:00.000Z",
+      remoteUpdatedAt: "2026-11-27T10:00:00.000Z",
+      hasRemote: true
+    }),
+    "push"
+  );
+
+  assert.equal(
+    profileSyncAction({
+      localReady: true,
+      localOwner: null,
+      currentOwner: "linxia",
+      localUpdatedAt: null,
+      remoteUpdatedAt: null,
+      hasRemote: false
+    }),
+    "push"
+  );
+});
+
+test("profileSyncAction resets another account's local profile when the server has none", () => {
+  assert.equal(
+    profileSyncAction({
+      localReady: true,
+      localOwner: "old-user",
+      currentOwner: "linxia",
+      localUpdatedAt: "2026-11-27T11:00:00.000Z",
+      remoteUpdatedAt: null,
+      hasRemote: false
+    }),
+    "reset"
+  );
+
+  assert.equal(
+    profileSyncAction({
+      localReady: false,
+      localOwner: "old-user",
+      currentOwner: "linxia",
+      localUpdatedAt: null,
+      remoteUpdatedAt: null,
+      hasRemote: false
+    }),
+    "none"
+  );
 });

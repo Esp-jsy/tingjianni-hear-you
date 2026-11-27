@@ -332,3 +332,28 @@ export function paginateProfiles(ranked, page = 0, size = 3) {
     totalPages
   };
 }
+
+export function profileSyncAction({
+  localReady,
+  localOwner,
+  currentOwner,
+  localUpdatedAt,
+  remoteUpdatedAt,
+  hasRemote
+}) {
+  const sameOwner = Boolean(localOwner) && localOwner === currentOwner;
+  const foreignOwner = Boolean(localOwner) && localOwner !== currentOwner;
+  const localTime = Date.parse(localUpdatedAt || "") || 0;
+  const remoteTime = Date.parse(remoteUpdatedAt || "") || 0;
+
+  if (hasRemote) {
+    if (!sameOwner) return "pull";
+    if (!localTime || remoteTime > localTime) return "pull";
+    if (localTime > remoteTime) return "push";
+    return "none";
+  }
+
+  if (foreignOwner) return localReady ? "reset" : "none";
+  if (localReady) return "push";
+  return "none";
+}

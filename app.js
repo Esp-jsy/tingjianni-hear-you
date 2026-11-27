@@ -13,6 +13,7 @@ import {
   paginateProfiles,
   planLabel,
   profileIsReady,
+  profileSyncAction,
   rankProfiles
 } from "./logic.js";
 import { createLocalAuth } from "./local-auth.js";
@@ -84,13 +85,17 @@ function loadStoredState() {
     return {
       profile: normalizedProfile(stored.profile || {}),
       selectedMatchId: stored.selectedMatchId || null,
-      plan: stored.plan || null
+      plan: stored.plan || null,
+      profileUpdatedAt: stored.profileUpdatedAt || null,
+      profileOwner: stored.profileOwner || null
     };
   } catch {
     return {
       profile: normalizedProfile({}),
       selectedMatchId: null,
-      plan: null
+      plan: null,
+      profileUpdatedAt: null,
+      profileOwner: null
     };
   }
 }
@@ -122,7 +127,9 @@ function persistState() {
     JSON.stringify({
       profile,
       selectedMatchId: state.selectedMatchId,
-      plan: state.plan
+      plan: state.plan,
+      profileUpdatedAt: state.profileUpdatedAt || null,
+      profileOwner: state.profileOwner || null
     })
   );
 }
@@ -457,6 +464,12 @@ function renderPromptList() {
       ? "已启用浏览器录音与语音转写。你可停止录音后继续修改转写文字。"
       : "已启用浏览器录音。当前浏览器不支持自动转写，但可继续录音并补充文字。"
     : "当前浏览器不能直接录音。资料仍可通过文字填写，完整页面不依赖麦克风。";
+
+  promptList.querySelectorAll("textarea[data-answer-key]").forEach((textarea) => {
+    if (document.activeElement !== textarea) {
+      textarea.value = state.profile.answers[textarea.dataset.answerKey] || "";
+    }
+  });
 }
 
 function chooseMimeType() {
@@ -1183,28 +1196,68 @@ function authErrorMessage(error) {
 async function syncProfileToServer() {
   if (authMode !== "server" || !authUser) return false;
   try {
-    await requestJson(`${API_BASE}/profile`, {
+    const saved = await requestJson(`${API_BASE}/profile`, {
       method: "PUT",
       body: { profile: state.profile }
     });
+    state.profileUpdatedAt = saved.updatedAt || new Date().toISOString();
+    state.profileOwner = authUser.username;
+    persistState();
+    renderAccountView();
     return true;
   } catch {
     return false;
   }
 }
 
-async function restoreServerProfile() {
+function clearLocalProfile() {
+  state.profile = normalizedProfile({});
+  state.profileUpdatedAt = null;
+  state.profileOwner = null;
+  persistState();
+  hydrateProfileForm();
+  renderPromptList();
+}
+
+async function reconcileProfileWithServer() {
   if (authMode !== "server" || !authUser) return;
+
+  let remote;
   try {
-    const { profile } = await requestJson(`${API_BASE}/profile`);
-    if (profile && !profileIsReady(state.profile)) {
-      state.profile = normalizedProfile(profile);
-      persistState();
-      hydrateProfileForm();
-      renderPromptList();
-    }
+    remote = await requestJson(`${API_BASE}/profile`);
   } catch {
-    // 资料接口暂时不可用时保持本地资料。
+    return;
+  }
+
+  const action = profileSyncAction({
+    localReady: profileIsReady(state.profile),
+    localOwner: state.profileOwner,
+    currentOwner: authUser.username,
+    localUpdatedAt: state.profileUpdatedAt,
+    remoteUpdatedAt: remote.updatedAt,
+    hasRemote: Boolean(remote.profile)
+  });
+
+  if (action === "pull") {
+    state.profile = normalizedProfile(remote.profile);
+    state.profileUpdatedAt = remote.updatedAt || null;
+    state.profileOwner = authUser.username;
+    persistState();
+    hydrateProfileForm();
+    renderPromptList();
+    renderPhotoPreview();
+    showToast("已从服务器恢复资料与照片。");
+    return;
+  }
+
+  if (action === "reset") {
+    clearLocalProfile();
+    return;
+  }
+
+  if (action === "push") {
+    const synced = await syncProfileToServer();
+    if (synced) showToast("资料已同步到服务器。");
   }
 }
 
@@ -1232,9 +1285,15 @@ function renderAccountView() {
     ? ""
     : new Intl.DateTimeFormat("zh-CN", { dateStyle: "long" }).format(registeredAt);
   const storageLabel = authMode === "local" ? " · 保存在当前浏览器" : "";
+  const syncLabel =
+    authMode === "server"
+      ? state.profileOwner === authUser.username && state.profileUpdatedAt
+        ? " · 资料与照片已同步"
+        : " · 资料尚未同步"
+      : "";
   accountMeta.textContent = dateLabel
-    ? `用户名：${authUser.username} · 注册于 ${dateLabel}${storageLabel}`
-    : `用户名：${authUser.username}${storageLabel}`;
+    ? `用户名：${authUser.username} · 注册于 ${dateLabel}${storageLabel}${syncLabel}`
+    : `用户名：${authUser.username}${storageLabel}${syncLabel}`;
 }
 
 function updateAccountUI() {
@@ -1262,7 +1321,7 @@ async function loadSession() {
   }
   sessionSettled = true;
   updateAccountUI();
-  await restoreServerProfile();
+  await reconcileProfileWithServer();
   if (state.plan && !planResult.hidden) {
     renderPlanInvite(state.plan);
   }
@@ -1328,7 +1387,7 @@ async function handleLogin(event) {
     authUser = user;
     loginForm.reset();
     updateAccountUI();
-    await restoreServerProfile();
+    await reconcileProfileWithServer();
     showToast(`欢迎回来，${user.displayName}。`);
     navigate("home");
   } catch (error) {
@@ -1360,6 +1419,7 @@ async function handleRegister(event) {
     );
     authUser = user;
     registerForm.reset();
+    await reconcileProfileWithServer();
     if (!state.profile.name) {
       state.profile.name = user.displayName;
       persistState();
